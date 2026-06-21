@@ -13,6 +13,7 @@ defmodule Arbiter.Documents.Chunk do
     field :visibility, :string, default: "department"
     field :acl_version, :string, default: "acl_v1"
     field :policy_version, :string, default: "policy_v1"
+    field :deleted_at, :utc_datetime
 
     belongs_to :document, Arbiter.Documents.Document
     belongs_to :tenant, Arbiter.Tenants.Tenant
@@ -29,7 +30,8 @@ defmodule Arbiter.Documents.Chunk do
       :sensitivity_level,
       :visibility,
       :acl_version,
-      :policy_version
+      :policy_version,
+      :deleted_at
     ])
     |> validate_required([:text, :sensitivity_level, :visibility, :acl_version, :policy_version])
     |> validate_number(:sensitivity_level, greater_than_or_equal_to: 0)

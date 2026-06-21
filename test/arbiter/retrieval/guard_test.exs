@@ -21,7 +21,7 @@ defmodule Arbiter.Retrieval.GuardTest do
                "visibility" => %{"$in" => ["public", "department"]},
                "department_id" => %{"$in" => ["finance", "legal"]},
                "sensitivity_level" => %{"$lte" => 3},
-               "deleted" => false
+               "deleted_at" => nil
              }
 
       assert guarded_query.policy_version == "policy_v12"
@@ -56,7 +56,7 @@ defmodule Arbiter.Retrieval.GuardTest do
           tenant_id: "tenant_a",
           department_id: "legal",
           sensitivity_level: 1,
-          deleted: true
+          deleted_at: ~U[2026-06-21 00:00:00Z]
         ),
         chunk("chunk_6",
           tenant_id: "tenant_a",
@@ -100,7 +100,7 @@ defmodule Arbiter.Retrieval.GuardTest do
           "tenant_id" => "tenant_a",
           "department_id" => "finance",
           "sensitivity_level" => 2,
-          "deleted" => false,
+          "deleted_at" => nil,
           "policy_version" => "policy_v12"
         }
       ]
@@ -140,7 +140,7 @@ defmodule Arbiter.Retrieval.GuardTest do
 
   defp chunk(id, attrs) do
     attrs
-    |> Keyword.put_new(:deleted, false)
+    |> Keyword.put_new(:deleted_at, nil)
     |> Keyword.put_new(:policy_version, "policy_v12")
     |> Keyword.put(:id, id)
     |> Map.new()

@@ -90,7 +90,7 @@ defmodule Arbiter.Policy.ParserTest do
     policy "literal_policy" {
       allow user retrieve chunk
       when user.clearance_level >= 2
-       and chunk.deleted == false
+       and chunk.deleted_at == false
     }
     """
 

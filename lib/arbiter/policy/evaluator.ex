@@ -4,6 +4,7 @@ defmodule Arbiter.Policy.Evaluator do
   """
 
   alias Arbiter.Policy.AST
+  alias Arbiter.Policy.Attributes
   alias Arbiter.Policy.Decision
 
   def evaluate(ast, context, opts \\ [])
@@ -24,7 +25,10 @@ defmodule Arbiter.Policy.Evaluator do
         deny(reasons, policy_version)
 
       reasons ->
-        allow(Enum.reverse(reasons), policy_version, build_scope(context))
+        case build_scope(context) do
+          {:ok, scope} -> allow(Enum.reverse(reasons), policy_version, scope)
+          {:error, _reason} -> deny(["scope_compile_failed"], policy_version)
+        end
     end
   end
 
@@ -45,48 +49,11 @@ defmodule Arbiter.Policy.Evaluator do
 
   defp resolve({:path, root, path}, context) do
     with {:ok, root_value} <- fetch_root(context, root) do
-      fetch_path(root_value, path)
+      Attributes.fetch_path(root_value, path)
     end
   end
 
-  defp fetch_root(context, "user"), do: fetch_map_value(context, :user, "user")
-  defp fetch_root(context, "chunk"), do: fetch_map_value(context, :chunk, "chunk")
-  defp fetch_root(context, root), do: fetch_map_value(context, root, root)
-
-  defp fetch_path(value, []), do: {:ok, value}
-
-  defp fetch_path(value, [field | rest]) do
-    with {:ok, next_value} <- fetch_field(value, field) do
-      fetch_path(next_value, rest)
-    end
-  end
-
-  defp fetch_field(value, field) when is_map(value) do
-    fetch_map_value(value, existing_atom(field), field)
-  end
-
-  defp fetch_field(_value, _field), do: {:error, :missing_attribute}
-
-  defp fetch_map_value(map, nil, string_key) do
-    case Map.fetch(map, string_key) do
-      {:ok, nil} -> {:error, :missing_attribute}
-      {:ok, value} -> {:ok, value}
-      :error -> {:error, :missing_attribute}
-    end
-  end
-
-  defp fetch_map_value(map, atom_key, string_key) do
-    cond do
-      Map.has_key?(map, atom_key) and not is_nil(Map.get(map, atom_key)) ->
-        {:ok, Map.fetch!(map, atom_key)}
-
-      Map.has_key?(map, string_key) and not is_nil(Map.get(map, string_key)) ->
-        {:ok, Map.fetch!(map, string_key)}
-
-      true ->
-        {:error, :missing_attribute}
-    end
-  end
+  defp fetch_root(context, root), do: Attributes.fetch_required(context, root)
 
   defp compare(left, :eq, right), do: {:ok, left == right}
   defp compare(left, :neq, right), do: {:ok, left != right}
@@ -110,13 +77,12 @@ defmodule Arbiter.Policy.Evaluator do
     with {:ok, tenant_id} <- resolve({:path, "user", ["tenant_id"]}, context),
          {:ok, departments} <- resolve({:path, "user", ["department_ids"]}, context),
          {:ok, clearance} <- resolve({:path, "user", ["clearance_level"]}, context) do
-      %{
-        "tenant_id" => tenant_id,
-        "departments" => departments,
-        "max_sensitivity" => clearance
-      }
-    else
-      {:error, _reason} -> %{}
+      {:ok,
+       %{
+         "tenant_id" => tenant_id,
+         "departments" => departments,
+         "max_sensitivity" => clearance
+       }}
     end
   end
 
@@ -126,11 +92,5 @@ defmodule Arbiter.Policy.Evaluator do
 
   defp deny(reasons, policy_version) do
     %Decision{decision: :deny, reason: reasons, policy_version: policy_version, scope: %{}}
-  end
-
-  defp existing_atom(value) do
-    String.to_existing_atom(value)
-  rescue
-    ArgumentError -> nil
   end
 end

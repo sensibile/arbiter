@@ -14,6 +14,7 @@ defmodule Arbiter.Policy.Parser do
 
   alias Arbiter.Policy.AST
   alias Arbiter.Policy.ParseError
+  alias Arbiter.Policy.Reasoner
 
   @policy_pattern ~r/^\s*policy\s+"([^"]+)"\s*\{\s*(.*?)\s*\}\s*$/s
   @allow_pattern ~r/^allow\s+([a-zA-Z_]\w*)\s+([a-zA-Z_]\w*)\s+([a-zA-Z_]\w*)$/
@@ -136,7 +137,7 @@ defmodule Arbiter.Policy.Parser do
          left: left_operand,
          operator: operator,
          right: right_operand,
-         reason: infer_reason(left_operand, operator, right_operand)
+         reason: Reasoner.infer(left_operand, operator, right_operand)
        }}
     else
       nil -> {:error, error(:invalid_condition, "expected <left> <operator> <right>")}
@@ -165,37 +166,6 @@ defmodule Arbiter.Policy.Parser do
         {:error, error(:invalid_operand, "unsupported operand: #{value}")}
     end
   end
-
-  defp infer_reason({:path, "user", ["tenant_id"]}, :eq, {:path, "chunk", ["tenant_id"]}) do
-    "same_tenant"
-  end
-
-  defp infer_reason({:path, "user", ["status"]}, :eq, {:literal, "active"}) do
-    "active_user"
-  end
-
-  defp infer_reason({:path, "chunk", ["source"]}, :eq, {:literal, _source}) do
-    "source_matched"
-  end
-
-  defp infer_reason(
-         {:path, "user", ["clearance_level"]},
-         :gte,
-         {:path, "chunk", ["sensitivity_level"]}
-       ) do
-    "clearance_ok"
-  end
-
-  defp infer_reason({:path, "chunk", ["department_id"]}, :in, {:path, "user", ["department_ids"]}) do
-    "department_scope_matched"
-  end
-
-  defp infer_reason(left, operator, right) do
-    "#{operand_name(left)}_#{operator}_#{operand_name(right)}"
-  end
-
-  defp operand_name({:path, root, path}), do: Enum.join([root | path], "_")
-  defp operand_name({:literal, value}), do: "literal_#{value}"
 
   defp error(reason, message), do: %ParseError{reason: reason, message: message}
 end

@@ -78,6 +78,31 @@ defmodule Arbiter.Policy.EvaluatorTest do
     assert decision.scope == %{}
   end
 
+  test "fails closed when conditions pass but scope cannot be built" do
+    ast = %AST{
+      name: "scope_required",
+      effect: :allow,
+      subject: "user",
+      action: "retrieve",
+      resource: "chunk",
+      conditions: [
+        %{
+          left: {:path, "user", ["tenant_id"]},
+          operator: :eq,
+          right: {:path, "chunk", ["tenant_id"]},
+          reason: "same_tenant"
+        }
+      ]
+    }
+
+    decision =
+      Evaluator.evaluate(ast, %{user: %{tenant_id: "tenant_a"}, chunk: %{tenant_id: "tenant_a"}})
+
+    assert decision.decision == :deny
+    assert decision.reason == ["scope_compile_failed"]
+    assert decision.scope == %{}
+  end
+
   test "supports map contexts as well as structs", %{ast: ast} do
     user = %{
       tenant_id: "tenant_a",

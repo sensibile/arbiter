@@ -58,7 +58,7 @@ defmodule Arbiter.Policy.ScopeCompilerTest do
                "visibility" => %{"$in" => ["public", "department"]},
                "department_id" => %{"$in" => ["finance", "legal"]},
                "sensitivity_level" => %{"$lte" => 3},
-               "deleted" => false
+               "deleted_at" => nil
              }
     end
 

@@ -47,7 +47,7 @@ defmodule Arbiter.Policy.ScopeCompiler do
          "visibility" => %{"$in" => @default_visibility},
          "department_id" => %{"$in" => normalized_scope.departments},
          "sensitivity_level" => %{"$lte" => normalized_scope.max_sensitivity},
-         "deleted" => false
+         "deleted_at" => nil
        }}
     end
   end
