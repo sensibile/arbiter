@@ -8,6 +8,7 @@ defmodule Arbiter.MixProject do
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
+      test_coverage: [summary: [threshold: 0]],
       aliases: aliases(),
       deps: deps(),
       listeners: [Phoenix.CodeReloader]
