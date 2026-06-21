@@ -1,9 +1,62 @@
-This is a web application written using the Phoenix web framework.
+This is Arbiter, a policy-aware access gateway for Agentic RAG systems.
+
+Use `ARBITER_DIRECTION.md` as the product and architecture source of truth. The implementation should move in small, testable slices rather than attempting the full system at once.
 
 ## Project guidelines
 
 - Use `mix precommit` alias when you are done with all changes and fix any pending issues
 - Use the already included and available `:req` (`Req`) library for HTTP requests, **avoid** `:httpoison`, `:tesla`, and `:httpc`. Req is included by default and is the preferred HTTP client for Phoenix apps
+- Keep changes aligned with the MVP sequence in `ARBITER_DIRECTION.md`: domain skeleton, minimal Policy DSL, scope compiler, retrieval guard, gateway, audit lineage, revoke simulation.
+- The current app is API/domain-first and was generated without HTML/assets. Treat LiveView/UI guidance below as relevant only when Console or UI work is explicitly introduced.
+
+## Arbiter architecture guidelines
+
+- Separate pure domain decisions from side-effecting boundary code.
+- Keep policy evaluation, scope compilation, retrieval filter construction, and lineage event shaping as pure data transformations where practical.
+- Keep Repo calls, transactions, external tool calls, vector/search adapters, HTTP clients, clocks, ID generation, runtime config, process messaging, and audit persistence in boundary/orchestration modules.
+- Do not let deep policy, retrieval, or audit domain modules call `Arbiter.Repo` directly. Prefer passing already-loaded data into domain functions and returning decisions, filters, events, or commands.
+- Make external dependencies explicit behind adapters or orchestration modules. This includes databases, vector stores, SaaS tools, LLM/tool gateways, cache stores, and OS/process boundaries.
+- Model failures deliberately. Security-sensitive paths must fail closed when policy, scope compilation, metadata filtering, or policy version validation cannot be completed.
+- Preserve tenant isolation in every data path. Tenant context should be explicit in contracts, queries, filters, audit events, and cache keys.
+- Do not redact unauthorized data after prompt construction. Unauthorized chunks must be excluded before retrieval results become prompt context.
+- Audit both allow and deny decisions when the action is security-relevant.
+
+## Delivery workflow
+
+Use this loop for each feature slice:
+
+1. Define requirements.
+2. Define contracts.
+3. Separate core and shell responsibilities.
+4. Derive test cases.
+5. Implement the feature.
+6. Confirm all relevant tests are green.
+7. Identify refactoring and cleanup opportunities.
+8. Apply worthwhile improvements and repeat the implementation loop as needed.
+9. Run a self-review with a review agent or review pass.
+10. Inspect review feedback and apply relevant changes by returning to the implementation loop.
+11. Run static analysis and security review.
+12. Apply relevant findings by returning to the implementation loop.
+13. Finish the feature only after review, static analysis, security review, and `mix precommit` pass.
+
+Contract definitions should include:
+
+- Input and output shapes.
+- Success, deny, and error semantics.
+- Fail-close behavior.
+- Required audit behavior.
+- Transaction boundaries.
+- Whether the function may call Repo or external adapters.
+- Ownership of clock, ID, config, process, and external service effects.
+
+## Testing and coverage
+
+- Prefer fast unit tests for pure core logic and focused integration tests for shell modules.
+- Before implementation, check requirements coverage: every contract should have normal, deny, failure, fail-close, and tenant-isolation cases where relevant.
+- After tests are green and before refactoring, run coverage to find implementation that is not exercised by tests.
+- Use `mix test --cover` as the default coverage check for now. Add a dedicated coverage tool or CI threshold only when the project needs file-level reports or enforceable gates.
+- Do not treat coverage percentage as a substitute for invariant coverage. Arbiter-specific invariants from `ARBITER_DIRECTION.md` are the more important test target.
+- For policy, retrieval, gateway, audit, or revoke changes, include tests for the relevant invariant before considering the feature complete.
 
 ### Phoenix v1.8 guidelines
 
