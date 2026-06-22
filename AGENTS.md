@@ -7,6 +7,7 @@ Use `ARBITER_DIRECTION.md` as the product and architecture source of truth. The 
 - Use `mix precommit` alias when you are done with all changes and fix any pending issues
 - Use the already included and available `:req` (`Req`) library for HTTP requests, **avoid** `:httpoison`, `:tesla`, and `:httpc`. Req is included by default and is the preferred HTTP client for Phoenix apps
 - Keep changes aligned with the MVP sequence in `ARBITER_DIRECTION.md`: domain skeleton, minimal Policy DSL, scope compiler, retrieval guard, gateway, audit lineage, revoke simulation.
+- Treat documentation as part of the feature slice. For every behavior, contract, architecture boundary, or workflow change, check whether `README.md`, `docs/`, `ARBITER_DIRECTION.md`, or this file need updates before finishing.
 - The current app is API/domain-first and was generated without HTML/assets. Treat LiveView/UI guidance below as relevant only when Console or UI work is explicitly introduced.
 
 ## Arbiter architecture guidelines
@@ -37,7 +38,8 @@ Use this loop for each feature slice:
 10. Inspect review feedback and apply relevant changes by returning to the implementation loop.
 11. Run static analysis and security review.
 12. Apply relevant findings by returning to the implementation loop.
-13. Finish the feature only after review, static analysis, security review, and `mix precommit` pass.
+13. Update relevant documentation or explicitly confirm no documentation change is needed.
+14. Finish the feature only after review, static analysis, security review, documentation review, and `mix precommit` pass.
 
 Contract definitions should include:
 
@@ -52,11 +54,28 @@ Contract definitions should include:
 ## Testing and coverage
 
 - Prefer fast unit tests for pure core logic and focused integration tests for shell modules.
+- Keep infrastructure tests separate from the default test suite. Use `mix infra.test` for Testcontainers-backed checks that start real services such as PostgreSQL.
 - Before implementation, check requirements coverage: every contract should have normal, deny, failure, fail-close, and tenant-isolation cases where relevant.
 - After tests are green and before refactoring, run coverage to find implementation that is not exercised by tests.
 - Use `mix test --cover` as the default coverage check for now. Add a dedicated coverage tool or CI threshold only when the project needs file-level reports or enforceable gates.
 - Do not treat coverage percentage as a substitute for invariant coverage. Arbiter-specific invariants from `ARBITER_DIRECTION.md` are the more important test target.
 - For policy, retrieval, gateway, audit, or revoke changes, include tests for the relevant invariant before considering the feature complete.
+
+## Documentation guidelines
+
+- Keep `README.md` as the current operator/developer entrypoint. It should describe the implemented MVP state, local setup, and verification commands.
+- Maintain documentation in English and Korean pairs when the document is reader-facing. For example, update both `README.md` and `README.ko.md`, and both `docs/architecture.md` and `docs/architecture.ko.md`.
+- Keep deeper architecture notes under `docs/`. Prefer small, current documents over broad aspirational restatements of `ARBITER_DIRECTION.md`.
+- When implementation moves beyond `ARBITER_DIRECTION.md`, update docs to describe the actual contracts, module boundaries, fail-close behavior, and known limitations.
+- Documentation should name the owning module for each side effect boundary: Repo transactions, external adapters, cache invalidation, process messaging, clocks, IDs, and audit persistence.
+- Do not duplicate large sections of `ARBITER_DIRECTION.md`; link to it and document the current implementation delta.
+
+## Architecture boundary checks
+
+- Use `mix xref graph --format cycles --label compile-connected` to check for compile-time dependency cycles before adding new cross-module dependencies.
+- Use `mix xref graph --format stats --label compile-connected` when a module starts acting like a broad dependency hub.
+- Use `mix xref trace path/to/file.ex --label compile` to understand why a file has compile-time dependencies.
+- For Arbiter-specific boundary enforcement, prefer adding explicit tests or a small custom check before introducing a new dependency. If the project outgrows manual checks, evaluate the `:boundary` library to enforce allowed cross-module calls during compilation.
 
 ### Phoenix v1.8 guidelines
 

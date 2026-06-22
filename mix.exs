@@ -27,7 +27,7 @@ defmodule Arbiter.MixProject do
 
   def cli do
     [
-      preferred_envs: [precommit: :test]
+      preferred_envs: [precommit: :test, "infra.test": :test]
     ]
   end
 
@@ -49,7 +49,8 @@ defmodule Arbiter.MixProject do
       {:gettext, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
-      {:bandit, "~> 1.5"}
+      {:bandit, "~> 1.5"},
+      {:testcontainers, "~> 2.3", only: :test}
     ]
   end
 
@@ -65,6 +66,7 @@ defmodule Arbiter.MixProject do
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
+      "infra.test": ["testcontainers.run test test_infra/postgres_outbox_test.exs"],
       precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
     ]
   end

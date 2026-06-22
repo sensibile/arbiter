@@ -8,6 +8,7 @@ defmodule Arbiter.Sync.RevokeSimulation do
 
   alias Arbiter.Policy.Version
   alias Arbiter.Repo
+  alias Arbiter.Sync.Outbox
   alias Arbiter.Tenants.User
 
   def revoke_user_access(user, opts \\ [])
@@ -23,7 +24,15 @@ defmodule Arbiter.Sync.RevokeSimulation do
             |> User.changeset(%{policy_version: next_policy_version})
             |> Repo.update!()
 
-          build_result(updated_user, current_user.policy_version, next_policy_version, opts)
+          result =
+            build_result(updated_user, current_user.policy_version, next_policy_version, opts)
+
+          outbox_events =
+            result.invalidation_commands
+            |> Outbox.invalidation_changesets()
+            |> Enum.map(&Repo.insert!/1)
+
+          Map.put(result, :outbox_events, outbox_events)
 
         {:error, reason} ->
           Repo.rollback(reason)
@@ -47,6 +56,7 @@ defmodule Arbiter.Sync.RevokeSimulation do
       user: user,
       previous_policy_version: previous_policy_version,
       current_policy_version: current_policy_version,
+      outbox_events: [],
       invalidation_commands: commands,
       audit_event: %{
         event_type: "access_revoked",

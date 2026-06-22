@@ -23,6 +23,15 @@ end
 config :arbiter, ArbiterWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+if config_env() == :test do
+  if database_url = System.get_env("DATABASE_URL") do
+    config :arbiter, Arbiter.Repo,
+      url: database_url,
+      pool: Ecto.Adapters.SQL.Sandbox,
+      pool_size: System.schedulers_online() * 2
+  end
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

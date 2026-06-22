@@ -1,38 +1,82 @@
 # Arbiter
 
+[한국어](README.ko.md)
+
 Arbiter is a policy-aware access gateway for Agentic RAG systems.
 
 It ensures that AI agents can only retrieve, use, and cite data the current user is allowed to access.
 
 ## Current Scope
 
-This repository is initialized as a Phoenix/Ecto application for the MVP described in `ARBITER_DIRECTION.md`.
+This repository is a Phoenix/Ecto implementation of the MVP described in `ARBITER_DIRECTION.md`.
 
-The first implementation slice is the domain skeleton:
+The current implementation has completed the first MVP pass:
 
 - Tenants, users, groups, and memberships
 - Documents and chunks
 - Policies and policy decisions
 - Agent runs
 - Retrieval traces
+- Minimal policy DSL parsing and evaluation
+- Scope compilation to SQL predicates and vector metadata filters
+- Retrieval guard with pre-search filter injection and post-search validation
+- Gateway orchestration for policy-aware tool calls
+- Audit lineage persistence for policy decisions, retrieval traces, and answer lineage
+- Revoke simulation with policy version bumping, transactional outbox invalidation commands, and stale snapshot fail-close
 
-To start your Phoenix server:
+See `docs/architecture.md` for the implemented module boundaries and contract summary.
+See `docs/adr/0001-state-sourced-cqrs.md` for the storage strategy.
 
-* Run `docker compose up -d db` to start the local PostgreSQL dependency
-* Run `mix setup` to install dependencies, create the database, and migrate it
-* Start Phoenix endpoint with `mix phx.server` or inside IEx with `iex -S mix phx.server`
+## Local Setup
 
-Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
+Run the local PostgreSQL dependency:
+
+```sh
+docker compose up -d db
+```
+
+Install dependencies, create the database, and migrate it:
+
+```sh
+mix setup
+```
+
+Run the test suite:
+
+```sh
+mix test
+```
+
+Run the project precommit check:
+
+```sh
+mix precommit
+```
+
+Run infrastructure tests with Testcontainers-managed PostgreSQL:
+
+```sh
+mix infra.test
+```
+
+The app was generated API/domain-first without HTML/assets. If you start the endpoint, use:
+
+```sh
+mix phx.server
+```
 
 The default local database URL is `ecto://postgres:postgres@localhost:55432/arbiter_dev`.
 Override it with `DATABASE_URL`; tests can use `TEST_DATABASE_URL`.
 
-Ready to run in production? Please [check our deployment guides](https://phoenix.hexdocs.pm/deployment.html).
+## Architecture Checks
 
-## Learn more
+Useful built-in dependency checks:
 
-* Official website: https://www.phoenixframework.org/
-* Guides: https://phoenix.hexdocs.pm/overview.html
-* Docs: https://phoenix.hexdocs.pm
-* Forum: https://elixirforum.com/c/phoenix-forum
-* Source: https://github.com/phoenixframework/phoenix
+```sh
+mix xref graph --format cycles --label compile-connected
+mix xref graph --format stats --label compile-connected
+```
+
+Use `mix xref trace path/to/file.ex --label compile` to investigate a specific compile-time dependency.
+
+For stronger architecture boundary enforcement, the likely next tool to evaluate is the `:boundary` library. For now, Arbiter keeps boundaries explicit through module contracts, focused tests, and xref checks.

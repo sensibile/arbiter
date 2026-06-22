@@ -2,6 +2,7 @@ defmodule Arbiter.Sync.RevokeSimulationTest do
   use Arbiter.DataCase, async: true
 
   alias Arbiter.Repo
+  alias Arbiter.Sync.OutboxEvent
   alias Arbiter.Sync.RevokeSimulation
   alias Arbiter.Tenants.Tenant
   alias Arbiter.Tenants.User
@@ -60,6 +61,23 @@ defmodule Arbiter.Sync.RevokeSimulationTest do
                current_policy_version: "policy_v13",
                invalidation_commands: result.invalidation_commands
              }
+
+      assert Enum.map(result.outbox_events, & &1.event_type) == [
+               "invalidate_user_access_cache",
+               "invalidate_tool_result_cache",
+               "invalidate_retrieval_result_cache"
+             ]
+
+      assert Repo.aggregate(OutboxEvent, :count) == 3
+
+      assert Enum.all?(result.outbox_events, fn event ->
+               event.tenant_id == tenant.id and
+                 event.aggregate_type == "user" and
+                 event.aggregate_id == user.id and
+                 event.status == "pending" and
+                 event.payload["previous_policy_version"] == "policy_v12" and
+                 event.payload["current_policy_version"] == "policy_v13"
+             end)
     end
 
     test "does not update user when policy version cannot be incremented" do
@@ -69,6 +87,7 @@ defmodule Arbiter.Sync.RevokeSimulationTest do
 
       reloaded_user = Repo.get!(User, user.id)
       assert reloaded_user.policy_version == "custom"
+      assert Repo.aggregate(OutboxEvent, :count) == 0
     end
 
     test "uses the latest persisted user policy version instead of a stale struct" do
