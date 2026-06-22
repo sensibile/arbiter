@@ -19,27 +19,14 @@ defmodule Arbiter.AuditTest do
 
   describe "record_retrieval_decision/1" do
     test "records policy decision and retrieval trace in one audit transaction" do
-      %{tenant: tenant, user: user, agent_run: agent_run} = fixture_scope()
+      scope = %{tenant: tenant, user: user, agent_run: agent_run} = fixture_scope()
 
-      event = %{
-        event_type: "retrieval_decision",
-        tenant_id: tenant.id,
-        user_id: user.id,
-        agent_run_id: agent_run.id,
-        tool: "semantic_search",
-        action: "retrieve",
-        resource_type: "document_chunk",
-        decision: "allow",
-        reason: ["same_tenant", "active_user"],
-        policy_version: "policy_v12",
-        retrieved_chunk_ids: [Ecto.UUID.generate(), Ecto.UUID.generate()],
-        accepted_chunk_ids: [],
-        rejected_chunk_ids: [],
-        applied_filter: %{"tenant_id" => tenant.id},
-        user_snapshot: %{"id" => user.id, "tenant_id" => tenant.id},
-        resource_snapshot: %{"resource_type" => "document_chunk"},
-        status: "allowed"
-      }
+      event =
+        retrieval_event(scope, %{
+          reason: ["same_tenant", "active_user"],
+          retrieved_chunk_ids: [Ecto.UUID.generate(), Ecto.UUID.generate()],
+          applied_filter: %{"tenant_id" => tenant.id}
+        })
 
       assert {:ok, %{policy_decision: policy_decision, retrieval_trace: retrieval_trace}} =
                Audit.record_retrieval_decision(event)
@@ -61,27 +48,13 @@ defmodule Arbiter.AuditTest do
     end
 
     test "records deny decisions without creating an empty retrieval trace" do
-      %{tenant: tenant, user: user, agent_run: agent_run} = fixture_scope()
-
-      event = %{
-        event_type: "retrieval_decision",
-        tenant_id: tenant.id,
-        user_id: user.id,
-        agent_run_id: agent_run.id,
-        tool: "semantic_search",
-        action: "retrieve",
-        resource_type: "document_chunk",
-        decision: "deny",
-        reason: ["rbac_denied"],
-        policy_version: "policy_v12",
-        retrieved_chunk_ids: [],
-        accepted_chunk_ids: [],
-        rejected_chunk_ids: [],
-        applied_filter: %{},
-        user_snapshot: %{"id" => user.id, "tenant_id" => tenant.id},
-        resource_snapshot: %{"resource_type" => "document_chunk"},
-        status: "denied"
-      }
+      event =
+        fixture_scope()
+        |> retrieval_event(%{
+          decision: "deny",
+          reason: ["rbac_denied"],
+          status: "denied"
+        })
 
       assert {:ok, %{policy_decision: policy_decision, retrieval_trace: nil}} =
                Audit.record_retrieval_decision(event)
@@ -133,7 +106,6 @@ defmodule Arbiter.AuditTest do
 
     test "fails closed when required audit fields are missing" do
       event = %{
-        event_type: "retrieval_decision",
         action: "retrieve",
         resource_type: "document_chunk",
         decision: "allow",
@@ -148,26 +120,12 @@ defmodule Arbiter.AuditTest do
     end
 
     test "rolls back policy decision when retrieval trace cannot be recorded" do
-      %{tenant: tenant, user: user, agent_run: agent_run} = fixture_scope()
+      scope = fixture_scope()
 
-      event = %{
-        event_type: "retrieval_decision",
-        tenant_id: tenant.id,
-        user_id: user.id,
-        agent_run_id: agent_run.id,
-        action: "retrieve",
-        resource_type: "document_chunk",
-        decision: "allow",
-        reason: ["same_tenant"],
-        policy_version: "policy_v12",
-        retrieved_chunk_ids: [],
-        accepted_chunk_ids: [],
-        rejected_chunk_ids: [],
-        applied_filter: %{"tenant_id" => tenant.id},
-        user_snapshot: %{"id" => user.id, "tenant_id" => tenant.id},
-        resource_snapshot: %{"resource_type" => "document_chunk"},
-        status: "allowed"
-      }
+      event =
+        scope
+        |> retrieval_event(%{applied_filter: %{"tenant_id" => scope.tenant.id}})
+        |> Map.delete(:tool)
 
       assert {:error, :retrieval_trace, changeset, %{}} =
                Audit.record_retrieval_decision(event)
@@ -221,34 +179,24 @@ defmodule Arbiter.AuditTest do
     end
 
     test "rejects answer lineage without used chunks or policy decisions" do
-      %{tenant: tenant, user: user, agent_run: agent_run} = fixture_scope()
+      scope = fixture_scope()
 
       assert {:error, changeset} =
-               Audit.record_answer_lineage(%{
-                 answer_id: Ecto.UUID.generate(),
-                 agent_run_id: agent_run.id,
-                 tenant_id: tenant.id,
-                 user_id: user.id,
-                 used_chunks: [],
-                 policy_decision_ids: []
-               })
+               scope
+               |> answer_lineage_attrs(%{used_chunks: [], policy_decision_ids: []})
+               |> Audit.record_answer_lineage()
 
       assert "should have at least 1 item(s)" in errors_on(changeset).used_chunks
       assert "should have at least 1 item(s)" in errors_on(changeset).policy_decision_ids
     end
 
     test "rejects malformed used chunk lineage" do
-      %{tenant: tenant, user: user, agent_run: agent_run} = fixture_scope()
+      scope = fixture_scope()
 
       assert {:error, changeset} =
-               Audit.record_answer_lineage(%{
-                 answer_id: Ecto.UUID.generate(),
-                 agent_run_id: agent_run.id,
-                 tenant_id: tenant.id,
-                 user_id: user.id,
-                 used_chunks: [%{"chunk_id" => "not-a-uuid"}],
-                 policy_decision_ids: [Ecto.UUID.generate()]
-               })
+               scope
+               |> answer_lineage_attrs(%{used_chunks: [%{"chunk_id" => "not-a-uuid"}]})
+               |> Audit.record_answer_lineage()
 
       assert "must include chunk_id, document_id, and policy_version for every chunk" in errors_on(
                changeset
@@ -256,23 +204,20 @@ defmodule Arbiter.AuditTest do
     end
 
     test "rejects used chunk lineage with invalid UUID fields" do
-      %{tenant: tenant, user: user, agent_run: agent_run} = fixture_scope()
+      scope = fixture_scope()
 
       assert {:error, changeset} =
-               Audit.record_answer_lineage(%{
-                 answer_id: Ecto.UUID.generate(),
-                 agent_run_id: agent_run.id,
-                 tenant_id: tenant.id,
-                 user_id: user.id,
+               scope
+               |> answer_lineage_attrs(%{
                  used_chunks: [
                    %{
                      "chunk_id" => Ecto.UUID.generate(),
                      "document_id" => 123,
                      "policy_version" => "policy_v12"
                    }
-                 ],
-                 policy_decision_ids: [Ecto.UUID.generate()]
+                 ]
                })
+               |> Audit.record_answer_lineage()
 
       assert "must include chunk_id, document_id, and policy_version for every chunk" in errors_on(
                changeset
@@ -304,5 +249,52 @@ defmodule Arbiter.AuditTest do
       |> Repo.insert!()
 
     %{tenant: tenant, user: user, agent_run: agent_run}
+  end
+
+  defp retrieval_event(%{tenant: tenant, user: user, agent_run: agent_run}, attrs) do
+    Map.merge(
+      %{
+        event_type: "retrieval_decision",
+        tenant_id: tenant.id,
+        user_id: user.id,
+        agent_run_id: agent_run.id,
+        tool: "semantic_search",
+        action: "retrieve",
+        resource_type: "document_chunk",
+        decision: "allow",
+        reason: ["same_tenant"],
+        policy_version: "policy_v12",
+        retrieved_chunk_ids: [],
+        accepted_chunk_ids: [],
+        rejected_chunk_ids: [],
+        applied_filter: %{},
+        user_snapshot: %{"id" => user.id, "tenant_id" => tenant.id},
+        resource_snapshot: %{"resource_type" => "document_chunk"},
+        status: "allowed"
+      },
+      attrs
+    )
+  end
+
+  defp answer_lineage_attrs(%{tenant: tenant, user: user, agent_run: agent_run}, attrs) do
+    Map.merge(
+      %{
+        answer_id: Ecto.UUID.generate(),
+        agent_run_id: agent_run.id,
+        tenant_id: tenant.id,
+        user_id: user.id,
+        used_chunks: [used_chunk()],
+        policy_decision_ids: [Ecto.UUID.generate()]
+      },
+      attrs
+    )
+  end
+
+  defp used_chunk do
+    %{
+      "chunk_id" => Ecto.UUID.generate(),
+      "document_id" => Ecto.UUID.generate(),
+      "policy_version" => "policy_v12"
+    }
   end
 end

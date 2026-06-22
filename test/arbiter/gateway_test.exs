@@ -117,10 +117,7 @@ defmodule Arbiter.GatewayTest do
                )
 
       refute_received :executed
-      assert error.reason == :tenant_scope_mismatch
-      assert error.audit_event.decision == "deny"
-      assert error.audit_event.reason == ["tenant_scope_mismatch"]
-      assert error.audit_event.status == "failed_closed"
+      assert_failed_closed(error, :tenant_scope_mismatch)
     end
 
     test "fails closed before execution when user policy snapshot is stale" do
@@ -141,11 +138,8 @@ defmodule Arbiter.GatewayTest do
                )
 
       refute_received :executed
-      assert error.reason == :stale_user_policy_version
-      assert error.audit_event.decision == "deny"
-      assert error.audit_event.reason == ["stale_user_policy_version"]
+      assert_failed_closed(error, :stale_user_policy_version)
       assert error.audit_event.policy_version == "policy_v12"
-      assert error.audit_event.status == "failed_closed"
     end
 
     test "fails closed before execution when resource policy snapshot is stale" do
@@ -171,11 +165,8 @@ defmodule Arbiter.GatewayTest do
                )
 
       refute_received :executed
-      assert error.reason == :stale_resource_policy_version
-      assert error.audit_event.decision == "deny"
-      assert error.audit_event.reason == ["stale_resource_policy_version"]
+      assert_failed_closed(error, :stale_resource_policy_version)
       assert error.audit_event.policy_version == "policy_v12"
-      assert error.audit_event.status == "failed_closed"
     end
 
     test "fails closed and audits when retrieved chunks cannot be validated" do
@@ -189,12 +180,9 @@ defmodule Arbiter.GatewayTest do
                  authorize: authorize(allow_decision())
                )
 
-      assert error.reason == :retrieval_validation_failed
-      assert error.audit_event.decision == "deny"
-      assert error.audit_event.reason == ["retrieval_validation_failed"]
+      assert_failed_closed(error, :retrieval_validation_failed)
       assert error.audit_event.retrieved_chunk_ids == ["chunk_1"]
       assert error.audit_event.accepted_chunk_ids == []
-      assert error.audit_event.status == "failed_closed"
     end
 
     test "fails closed when authorization cannot complete" do
@@ -204,10 +192,7 @@ defmodule Arbiter.GatewayTest do
                  authorize: fn _tool_call -> {:error, :policy_store_unavailable} end
                )
 
-      assert error.reason == :authorization_failed
-      assert error.audit_event.decision == "deny"
-      assert error.audit_event.reason == ["authorization_failed"]
-      assert error.audit_event.status == "failed_closed"
+      assert_failed_closed(error, :authorization_failed)
     end
 
     test "fails closed when authorization returns an invalid shape" do
@@ -217,10 +202,7 @@ defmodule Arbiter.GatewayTest do
                  authorize: fn _tool_call -> :allow end
                )
 
-      assert error.reason == :authorization_failed
-      assert error.audit_event.decision == "deny"
-      assert error.audit_event.reason == ["authorization_failed"]
-      assert error.audit_event.status == "failed_closed"
+      assert_failed_closed(error, :authorization_failed)
     end
 
     test "fails closed when authorization dependency is missing" do
@@ -230,10 +212,7 @@ defmodule Arbiter.GatewayTest do
                  authorize: :missing_authorizer
                )
 
-      assert error.reason == :authorization_failed
-      assert error.audit_event.decision == "deny"
-      assert error.audit_event.reason == ["authorization_failed"]
-      assert error.audit_event.status == "failed_closed"
+      assert_failed_closed(error, :authorization_failed)
     end
 
     test "fails closed when the tool call shape is invalid" do
@@ -243,11 +222,8 @@ defmodule Arbiter.GatewayTest do
                  authorize: authorize(allow_decision())
                )
 
-      assert error.reason == :invalid_tool_call
-      assert error.audit_event.decision == "deny"
-      assert error.audit_event.reason == ["invalid_tool_call"]
+      assert_failed_closed(error, :invalid_tool_call)
       assert error.audit_event.tenant_id == nil
-      assert error.audit_event.status == "failed_closed"
     end
 
     test "fails closed before authorization when the tool is unknown" do
@@ -265,10 +241,7 @@ defmodule Arbiter.GatewayTest do
                )
 
       refute_received :executed
-      assert error.reason == :unknown_tool
-      assert error.audit_event.decision == "deny"
-      assert error.audit_event.reason == ["unknown_tool"]
-      assert error.audit_event.status == "failed_closed"
+      assert_failed_closed(error, :unknown_tool)
     end
 
     test "fails closed before authorization when the tool registry is invalid" do
@@ -278,10 +251,7 @@ defmodule Arbiter.GatewayTest do
                  authorize: authorize(allow_decision())
                )
 
-      assert error.reason == :invalid_tool_registry
-      assert error.audit_event.decision == "deny"
-      assert error.audit_event.reason == ["invalid_tool_registry"]
-      assert error.audit_event.status == "failed_closed"
+      assert_failed_closed(error, :invalid_tool_registry)
     end
 
     test "fails closed before authorization when the tool contract mismatches" do
@@ -300,10 +270,7 @@ defmodule Arbiter.GatewayTest do
                  authorize: authorize(allow_decision())
                )
 
-      assert error.reason == :tool_contract_mismatch
-      assert error.audit_event.decision == "deny"
-      assert error.audit_event.reason == ["tool_contract_mismatch"]
-      assert error.audit_event.status == "failed_closed"
+      assert_failed_closed(error, :tool_contract_mismatch)
     end
 
     test "fails closed before authorization when the tool is missing an executor" do
@@ -321,10 +288,7 @@ defmodule Arbiter.GatewayTest do
                  authorize: authorize(allow_decision())
                )
 
-      assert error.reason == :invalid_tool_contract
-      assert error.audit_event.decision == "deny"
-      assert error.audit_event.reason == ["invalid_tool_contract"]
-      assert error.audit_event.status == "failed_closed"
+      assert_failed_closed(error, :invalid_tool_contract)
     end
 
     test "allows matching policy snapshot versions and non-map snapshots" do
@@ -358,10 +322,7 @@ defmodule Arbiter.GatewayTest do
                  authorize: authorize(invalid_scope_decision)
                )
 
-      assert error.reason == :invalid_scope
-      assert error.audit_event.decision == "deny"
-      assert error.audit_event.reason == ["invalid_scope"]
-      assert error.audit_event.status == "failed_closed"
+      assert_failed_closed(error, :invalid_scope)
     end
 
     test "fails closed when tool execution returns an error tuple" do
@@ -371,10 +332,7 @@ defmodule Arbiter.GatewayTest do
                  authorize: authorize(allow_decision())
                )
 
-      assert error.reason == :tool_execution_failed
-      assert error.audit_event.decision == "deny"
-      assert error.audit_event.reason == ["tool_execution_failed"]
-      assert error.audit_event.status == "failed_closed"
+      assert_failed_closed(error, :tool_execution_failed)
     end
 
     test "fails closed when tool execution returns an invalid shape" do
@@ -384,10 +342,7 @@ defmodule Arbiter.GatewayTest do
                  authorize: authorize(allow_decision())
                )
 
-      assert error.reason == :tool_execution_failed
-      assert error.audit_event.decision == "deny"
-      assert error.audit_event.reason == ["tool_execution_failed"]
-      assert error.audit_event.status == "failed_closed"
+      assert_failed_closed(error, :tool_execution_failed)
     end
 
     test "fails closed when tool execution raises or throws" do
@@ -397,10 +352,7 @@ defmodule Arbiter.GatewayTest do
                  authorize: authorize(allow_decision())
                )
 
-      assert error.reason == :tool_execution_failed
-      assert error.audit_event.decision == "deny"
-      assert error.audit_event.reason == ["tool_execution_failed"]
-      assert error.audit_event.status == "failed_closed"
+      assert_failed_closed(error, :tool_execution_failed)
 
       assert {:error, error} =
                Gateway.run_tool_call(tool_call(),
@@ -408,10 +360,7 @@ defmodule Arbiter.GatewayTest do
                  authorize: authorize(allow_decision())
                )
 
-      assert error.reason == :tool_execution_failed
-      assert error.audit_event.decision == "deny"
-      assert error.audit_event.reason == ["tool_execution_failed"]
-      assert error.audit_event.status == "failed_closed"
+      assert_failed_closed(error, :tool_execution_failed)
     end
   end
 
@@ -427,6 +376,13 @@ defmodule Arbiter.GatewayTest do
   end
 
   defp authorize(decision), do: fn _tool_call -> {:ok, decision} end
+
+  defp assert_failed_closed(error, reason) do
+    assert error.reason == reason
+    assert error.audit_event.decision == "deny"
+    assert error.audit_event.reason == [Atom.to_string(reason)]
+    assert error.audit_event.status == "failed_closed"
+  end
 
   defp tool_call(attrs \\ []) do
     defaults = %{
