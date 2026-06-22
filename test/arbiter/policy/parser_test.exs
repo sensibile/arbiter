@@ -62,6 +62,33 @@ defmodule Arbiter.Policy.ParserTest do
     assert error.reason == :invalid_policy
   end
 
+  test "returns an error for non-string DSL" do
+    assert {:error, error} = Parser.parse(%{})
+    assert error.reason == :invalid_policy
+  end
+
+  test "rejects an empty policy body" do
+    dsl = """
+    policy "empty" {
+    }
+    """
+
+    assert {:error, error} = Parser.parse(dsl)
+    assert error.reason == :invalid_policy
+  end
+
+  test "rejects invalid allow lines" do
+    dsl = """
+    policy "bad_allow" {
+      deny user retrieve chunk
+      when user.tenant_id == chunk.tenant_id
+    }
+    """
+
+    assert {:error, error} = Parser.parse(dsl)
+    assert error.reason == :invalid_allow
+  end
+
   test "requires at least one condition" do
     dsl = """
     policy "empty" {
@@ -71,6 +98,41 @@ defmodule Arbiter.Policy.ParserTest do
 
     assert {:error, error} = Parser.parse(dsl)
     assert error.reason == :missing_conditions
+  end
+
+  test "requires condition lines to start with when and and" do
+    first_condition_dsl = """
+    policy "bad_first_condition" {
+      allow user retrieve chunk
+      user.tenant_id == chunk.tenant_id
+    }
+    """
+
+    assert {:error, error} = Parser.parse(first_condition_dsl)
+    assert error.reason == :invalid_condition_prefix
+
+    rest_condition_dsl = """
+    policy "bad_rest_condition" {
+      allow user retrieve chunk
+      when user.tenant_id == chunk.tenant_id
+      user.status == "active"
+    }
+    """
+
+    assert {:error, error} = Parser.parse(rest_condition_dsl)
+    assert error.reason == :invalid_condition_prefix
+  end
+
+  test "rejects invalid condition shape" do
+    dsl = """
+    policy "bad_condition" {
+      allow user retrieve chunk
+      when user.status
+    }
+    """
+
+    assert {:error, error} = Parser.parse(dsl)
+    assert error.reason == :invalid_condition
   end
 
   test "rejects unsupported operands" do

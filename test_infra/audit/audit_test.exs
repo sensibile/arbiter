@@ -92,6 +92,45 @@ defmodule Arbiter.AuditTest do
       assert Repo.aggregate(RetrievalTrace, :count) == 0
     end
 
+    test "records rejected-only retrieval traces for failed-closed decisions" do
+      %{tenant: tenant, user: user, agent_run: agent_run} = fixture_scope()
+
+      rejected_chunk_id = Ecto.UUID.generate()
+
+      event = %{
+        "event_type" => "retrieval_decision",
+        "tenant_id" => tenant.id,
+        "user_id" => user.id,
+        "agent_run_id" => agent_run.id,
+        "tool" => "semantic_search",
+        "action" => "retrieve",
+        "resource_type" => "document_chunk",
+        "decision" => "deny",
+        "reason" => ["retrieval_validation_failed"],
+        "policy_version" => "policy_v12",
+        "retrieved_chunk_ids" => [rejected_chunk_id],
+        "accepted_chunk_ids" => [],
+        "rejected_chunk_ids" => [rejected_chunk_id],
+        "applied_filter" => %{},
+        "user_snapshot" => %{"id" => user.id, "tenant_id" => tenant.id},
+        "resource_snapshot" => %{"resource_type" => "document_chunk"},
+        "status" => "failed_closed"
+      }
+
+      assert {:ok, %{policy_decision: policy_decision, retrieval_trace: retrieval_trace}} =
+               Audit.record_retrieval_decision(event)
+
+      assert policy_decision.decision == "deny"
+      assert retrieval_trace.rejected_chunk_ids == [rejected_chunk_id]
+      assert retrieval_trace.applied_filter == %{}
+      assert Repo.aggregate(PolicyDecision, :count) == 1
+      assert Repo.aggregate(RetrievalTrace, :count) == 1
+    end
+
+    test "rejects invalid retrieval decision input" do
+      assert {:error, :invalid_event} = Audit.record_retrieval_decision(:not_an_event)
+    end
+
     test "fails closed when required audit fields are missing" do
       event = %{
         event_type: "retrieval_decision",
@@ -196,6 +235,52 @@ defmodule Arbiter.AuditTest do
 
       assert "should have at least 1 item(s)" in errors_on(changeset).used_chunks
       assert "should have at least 1 item(s)" in errors_on(changeset).policy_decision_ids
+    end
+
+    test "rejects malformed used chunk lineage" do
+      %{tenant: tenant, user: user, agent_run: agent_run} = fixture_scope()
+
+      assert {:error, changeset} =
+               Audit.record_answer_lineage(%{
+                 answer_id: Ecto.UUID.generate(),
+                 agent_run_id: agent_run.id,
+                 tenant_id: tenant.id,
+                 user_id: user.id,
+                 used_chunks: [%{"chunk_id" => "not-a-uuid"}],
+                 policy_decision_ids: [Ecto.UUID.generate()]
+               })
+
+      assert "must include chunk_id, document_id, and policy_version for every chunk" in errors_on(
+               changeset
+             ).used_chunks
+    end
+
+    test "rejects used chunk lineage with invalid UUID fields" do
+      %{tenant: tenant, user: user, agent_run: agent_run} = fixture_scope()
+
+      assert {:error, changeset} =
+               Audit.record_answer_lineage(%{
+                 answer_id: Ecto.UUID.generate(),
+                 agent_run_id: agent_run.id,
+                 tenant_id: tenant.id,
+                 user_id: user.id,
+                 used_chunks: [
+                   %{
+                     "chunk_id" => Ecto.UUID.generate(),
+                     "document_id" => 123,
+                     "policy_version" => "policy_v12"
+                   }
+                 ],
+                 policy_decision_ids: [Ecto.UUID.generate()]
+               })
+
+      assert "must include chunk_id, document_id, and policy_version for every chunk" in errors_on(
+               changeset
+             ).used_chunks
+    end
+
+    test "rejects invalid answer lineage input" do
+      assert {:error, :invalid_lineage} = Audit.record_answer_lineage(:not_lineage)
     end
   end
 

@@ -157,6 +157,11 @@ defmodule Arbiter.Sync.RevokeSimulationTest do
       assert error.reason == :stale_user_policy_version
       assert error.audit_event.reason == ["stale_user_policy_version"]
     end
+
+    test "rejects invalid user input without writing outbox events" do
+      assert {:error, :invalid_user} = RevokeSimulation.revoke_user_access(%{})
+      assert Repo.aggregate(OutboxEvent, :count) == 0
+    end
   end
 
   defp tools(execute) do

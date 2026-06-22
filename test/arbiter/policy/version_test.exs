@@ -9,6 +9,7 @@ defmodule Arbiter.Policy.VersionTest do
     end
 
     test "fails closed for unsupported version formats" do
+      assert Version.next("policy_vabc") == {:error, :invalid_policy_version}
       assert Version.next("v12") == {:error, :invalid_policy_version}
       assert Version.next(nil) == {:error, :invalid_policy_version}
     end

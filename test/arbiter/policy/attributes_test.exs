@@ -26,6 +26,19 @@ defmodule Arbiter.Policy.AttributesTest do
     assert {:error, :missing_attribute} = Attributes.fetch_required(%{}, "missing")
   end
 
+  test "returns an error for values that cannot contain attributes" do
+    assert {:error, :missing_attribute} = Attributes.fetch_required(nil, "tenant_id")
+    assert {:error, :missing_attribute} = Attributes.fetch_present(:not_a_map, "tenant_id")
+    assert nil == Attributes.fetch_optional(:not_a_map, "tenant_id")
+  end
+
+  test "does not create atoms when a key is unknown" do
+    unknown_key = "arbiter_unknown_#{System.unique_integer([:positive])}"
+
+    assert {:error, :missing_attribute} = Attributes.fetch_present(%{}, unknown_key)
+    assert nil == Attributes.fetch_optional(%{}, unknown_key)
+  end
+
   test "distinguishes present nil values from missing values" do
     assert {:ok, nil} = Attributes.fetch_present(%{"deleted_at" => nil}, "deleted_at")
     assert {:error, :missing_attribute} = Attributes.fetch_present(%{}, "deleted_at")

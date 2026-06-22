@@ -210,10 +210,201 @@ defmodule Arbiter.GatewayTest do
       assert error.audit_event.status == "failed_closed"
     end
 
-    test "fails closed when tool execution raises" do
+    test "fails closed when authorization returns an invalid shape" do
+      assert {:error, error} =
+               Gateway.run_tool_call(tool_call(),
+                 tools: tools(fn _guarded_query -> {:ok, []} end),
+                 authorize: fn _tool_call -> :allow end
+               )
+
+      assert error.reason == :authorization_failed
+      assert error.audit_event.decision == "deny"
+      assert error.audit_event.reason == ["authorization_failed"]
+      assert error.audit_event.status == "failed_closed"
+    end
+
+    test "fails closed when authorization dependency is missing" do
+      assert {:error, error} =
+               Gateway.run_tool_call(tool_call(),
+                 tools: tools(fn _guarded_query -> {:ok, []} end),
+                 authorize: :missing_authorizer
+               )
+
+      assert error.reason == :authorization_failed
+      assert error.audit_event.decision == "deny"
+      assert error.audit_event.reason == ["authorization_failed"]
+      assert error.audit_event.status == "failed_closed"
+    end
+
+    test "fails closed when the tool call shape is invalid" do
+      assert {:error, error} =
+               Gateway.run_tool_call(%{tool: "semantic_search"},
+                 tools: tools(fn _guarded_query -> {:ok, []} end),
+                 authorize: authorize(allow_decision())
+               )
+
+      assert error.reason == :invalid_tool_call
+      assert error.audit_event.decision == "deny"
+      assert error.audit_event.reason == ["invalid_tool_call"]
+      assert error.audit_event.tenant_id == nil
+      assert error.audit_event.status == "failed_closed"
+    end
+
+    test "fails closed before authorization when the tool is unknown" do
+      test_pid = self()
+
+      execute = fn _guarded_query ->
+        send(test_pid, :executed)
+        {:ok, []}
+      end
+
+      assert {:error, error} =
+               Gateway.run_tool_call(tool_call(tool: "missing_tool"),
+                 tools: tools(execute),
+                 authorize: authorize(allow_decision())
+               )
+
+      refute_received :executed
+      assert error.reason == :unknown_tool
+      assert error.audit_event.decision == "deny"
+      assert error.audit_event.reason == ["unknown_tool"]
+      assert error.audit_event.status == "failed_closed"
+    end
+
+    test "fails closed before authorization when the tool registry is invalid" do
+      assert {:error, error} =
+               Gateway.run_tool_call(tool_call(),
+                 tools: [],
+                 authorize: authorize(allow_decision())
+               )
+
+      assert error.reason == :invalid_tool_registry
+      assert error.audit_event.decision == "deny"
+      assert error.audit_event.reason == ["invalid_tool_registry"]
+      assert error.audit_event.status == "failed_closed"
+    end
+
+    test "fails closed before authorization when the tool contract mismatches" do
+      mismatched_tools = %{
+        "semantic_search" => %{
+          action: "delete",
+          resource_type: "document_chunk",
+          kind: :vector_retrieval,
+          execute: fn _guarded_query -> {:ok, []} end
+        }
+      }
+
+      assert {:error, error} =
+               Gateway.run_tool_call(tool_call(),
+                 tools: mismatched_tools,
+                 authorize: authorize(allow_decision())
+               )
+
+      assert error.reason == :tool_contract_mismatch
+      assert error.audit_event.decision == "deny"
+      assert error.audit_event.reason == ["tool_contract_mismatch"]
+      assert error.audit_event.status == "failed_closed"
+    end
+
+    test "fails closed before authorization when the tool is missing an executor" do
+      invalid_tools = %{
+        "semantic_search" => %{
+          action: "retrieve",
+          resource_type: "document_chunk",
+          kind: :vector_retrieval
+        }
+      }
+
+      assert {:error, error} =
+               Gateway.run_tool_call(tool_call(),
+                 tools: invalid_tools,
+                 authorize: authorize(allow_decision())
+               )
+
+      assert error.reason == :invalid_tool_contract
+      assert error.audit_event.decision == "deny"
+      assert error.audit_event.reason == ["invalid_tool_contract"]
+      assert error.audit_event.status == "failed_closed"
+    end
+
+    test "allows matching policy snapshot versions and non-map snapshots" do
+      assert {:ok, result} =
+               Gateway.run_tool_call(
+                 tool_call(
+                   user_snapshot: %{"id" => "user_123", "policy_version" => "policy_v12"},
+                   resource_snapshot: :not_loaded
+                 ),
+                 tools: tools(fn _guarded_query -> {:ok, []} end),
+                 authorize: authorize(allow_decision())
+               )
+
+      assert result.audit_event.decision == "allow"
+      assert result.audit_event.accepted_chunk_ids == []
+      assert result.audit_event.status == "allowed"
+    end
+
+    test "fails closed when policy scope cannot compile into a retrieval filter" do
+      invalid_scope_decision =
+        allow_decision()
+        |> Map.put(:scope, %{
+          "tenant_id" => "tenant_a",
+          "departments" => [],
+          "max_sensitivity" => 3
+        })
+
+      assert {:error, error} =
+               Gateway.run_tool_call(tool_call(),
+                 tools: tools(fn _guarded_query -> {:ok, []} end),
+                 authorize: authorize(invalid_scope_decision)
+               )
+
+      assert error.reason == :invalid_scope
+      assert error.audit_event.decision == "deny"
+      assert error.audit_event.reason == ["invalid_scope"]
+      assert error.audit_event.status == "failed_closed"
+    end
+
+    test "fails closed when tool execution returns an error tuple" do
+      assert {:error, error} =
+               Gateway.run_tool_call(tool_call(),
+                 tools: tools(fn _guarded_query -> {:error, :vector_store_unavailable} end),
+                 authorize: authorize(allow_decision())
+               )
+
+      assert error.reason == :tool_execution_failed
+      assert error.audit_event.decision == "deny"
+      assert error.audit_event.reason == ["tool_execution_failed"]
+      assert error.audit_event.status == "failed_closed"
+    end
+
+    test "fails closed when tool execution returns an invalid shape" do
+      assert {:error, error} =
+               Gateway.run_tool_call(tool_call(),
+                 tools: tools(fn _guarded_query -> :ok end),
+                 authorize: authorize(allow_decision())
+               )
+
+      assert error.reason == :tool_execution_failed
+      assert error.audit_event.decision == "deny"
+      assert error.audit_event.reason == ["tool_execution_failed"]
+      assert error.audit_event.status == "failed_closed"
+    end
+
+    test "fails closed when tool execution raises or throws" do
       assert {:error, error} =
                Gateway.run_tool_call(tool_call(),
                  tools: tools(fn _guarded_query -> raise "vector store unavailable" end),
+                 authorize: authorize(allow_decision())
+               )
+
+      assert error.reason == :tool_execution_failed
+      assert error.audit_event.decision == "deny"
+      assert error.audit_event.reason == ["tool_execution_failed"]
+      assert error.audit_event.status == "failed_closed"
+
+      assert {:error, error} =
+               Gateway.run_tool_call(tool_call(),
+                 tools: tools(fn _guarded_query -> throw(:vector_store_unavailable) end),
                  authorize: authorize(allow_decision())
                )
 
