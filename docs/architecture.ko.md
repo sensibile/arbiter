@@ -151,4 +151,13 @@ mix infra.test
 
 Infrastructure test는 기본 `test/` 트리 밖의 `test_infra/`에 둡니다. 그래서 `mix test`는 빠르게 유지되고 Docker를 요구하지 않습니다.
 
-Persistence boundary test가 기본 suite 밖에 있으므로 `mix test --cover`는 fast core와 gateway coverage만 반영합니다. Persistence boundary 검증 gate로는 `mix infra.test`를 사용합니다.
+Coverage는 두 가지 명시적인 모드로 나눕니다.
+
+```sh
+mix coverage.core
+mix coverage.all
+```
+
+순수 policy, retrieval, gateway 로직을 반복 수정할 때는 `mix coverage.core`를 사용합니다. 이 명령은 fast suite를 실행하고 shell, persistence, schema, Phoenix scaffold 모듈을 제외하므로 의도적으로 분리한 boundary가 자주 0% 노이즈로 보이지 않습니다.
+
+큰 변경 완료 시점이나 주기적으로 누락 테스트를 복구할 때는 `mix coverage.all`을 사용합니다. 이 명령은 Testcontainers를 통해 `test/`와 `test_infra/`를 함께 실행하고 전체 모듈을 report에 포함합니다.

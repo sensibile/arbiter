@@ -59,7 +59,19 @@ Testcontainers가 관리하는 PostgreSQL로 infrastructure test를 실행합니
 mix infra.test
 ```
 
-`mix test --cover`는 기본 fast suite의 coverage만 보고합니다. Persistence boundary coverage는 `mix infra.test`가 담당합니다.
+순수 policy, retrieval, gateway 로직을 수정하는 동안에는 core coverage를 사용합니다.
+
+```sh
+mix coverage.core
+```
+
+큰 변경 완료 시점이나 persistence boundary까지 포함해 누락 테스트를 복구할 때는 full coverage를 사용합니다.
+
+```sh
+mix coverage.all
+```
+
+`mix coverage.core`는 fast suite를 실행하고 shell, persistence, schema, Phoenix scaffold 모듈을 제외합니다. `mix coverage.all`은 Testcontainers를 통해 `test/`와 `test_infra/`를 함께 실행하고 전체 모듈을 report에 포함합니다.
 
 이 앱은 HTML/assets 없이 API/domain-first로 생성되었습니다. endpoint를 실행하려면 다음 명령을 사용합니다.
 

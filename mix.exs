@@ -8,7 +8,7 @@ defmodule Arbiter.MixProject do
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
-      test_coverage: [summary: [threshold: 0]],
+      test_coverage: test_coverage(),
       aliases: aliases(),
       deps: deps(),
       listeners: [Phoenix.CodeReloader]
@@ -27,7 +27,12 @@ defmodule Arbiter.MixProject do
 
   def cli do
     [
-      preferred_envs: [precommit: :test, "infra.test": :test]
+      preferred_envs: [
+        precommit: :test,
+        "infra.test": :test,
+        "coverage.all": :test,
+        "coverage.core": :test
+      ]
     ]
   end
 
@@ -67,7 +72,48 @@ defmodule Arbiter.MixProject do
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       "infra.test": ["testcontainers.run test test_infra"],
+      "coverage.core": ["cmd --shell MIX_ENV=test ARBITER_COVERAGE_MODE=core mix test --cover"],
+      "coverage.all": ["testcontainers.run test -- --cover test test_infra"],
       precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
+    ]
+  end
+
+  defp test_coverage do
+    base = [summary: [threshold: 0]]
+
+    if System.get_env("ARBITER_COVERAGE_MODE") == "core" do
+      Keyword.put(base, :ignore_modules, core_coverage_ignored_modules())
+    else
+      base
+    end
+  end
+
+  defp core_coverage_ignored_modules do
+    [
+      Arbiter,
+      Arbiter.Application,
+      Arbiter.Repo,
+      ArbiterWeb,
+      ArbiterWeb.Endpoint,
+      ArbiterWeb.ErrorJSON,
+      ArbiterWeb.Gettext,
+      ArbiterWeb.Router,
+      ArbiterWeb.Telemetry,
+      Arbiter.Agents.AgentRun,
+      Arbiter.Audit,
+      Arbiter.Audit.AnswerLineage,
+      Arbiter.Documents.Chunk,
+      Arbiter.Documents.Document,
+      Arbiter.Policy.Policy,
+      Arbiter.Policy.PolicyDecision,
+      Arbiter.Retrieval.RetrievalTrace,
+      Arbiter.Sync.Outbox,
+      Arbiter.Sync.OutboxEvent,
+      Arbiter.Sync.RevokeSimulation,
+      Arbiter.Tenants.Group,
+      Arbiter.Tenants.Membership,
+      Arbiter.Tenants.Tenant,
+      Arbiter.Tenants.User
     ]
   end
 end

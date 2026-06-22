@@ -151,4 +151,13 @@ mix infra.test
 
 Infrastructure tests live outside the default `test/` tree under `test_infra/` so `mix test` remains fast and does not require Docker.
 
-Because persistence boundary tests are outside the default suite, `mix test --cover` only reflects fast core and gateway coverage. Use `mix infra.test` as the persistence-boundary verification gate.
+Coverage has two explicit modes:
+
+```sh
+mix coverage.core
+mix coverage.all
+```
+
+Use `mix coverage.core` while iterating on pure policy, retrieval, and gateway logic. It runs the fast suite and ignores shell, persistence, schema, and Phoenix scaffold modules so those intentionally separated boundaries do not appear as frequent 0% noise.
+
+Use `mix coverage.all` at larger completion points or during periodic missing-test recovery. It runs both `test/` and `test_infra/` through Testcontainers and keeps the full module set in the report.

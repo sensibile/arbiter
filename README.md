@@ -59,7 +59,19 @@ Run infrastructure tests with Testcontainers-managed PostgreSQL:
 mix infra.test
 ```
 
-`mix test --cover` reports coverage for the default fast suite only. Persistence boundary coverage lives in `mix infra.test`.
+Use core coverage while changing pure policy, retrieval, or gateway logic:
+
+```sh
+mix coverage.core
+```
+
+Use full coverage at larger completion points or when recovering missing tests across persistence boundaries:
+
+```sh
+mix coverage.all
+```
+
+`mix coverage.core` runs the fast suite and ignores shell, persistence, schema, and Phoenix scaffold modules. `mix coverage.all` runs both `test/` and `test_infra/` through Testcontainers and keeps the full module set in the report.
 
 The app was generated API/domain-first without HTML/assets. If you start the endpoint, use:
 
