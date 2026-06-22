@@ -22,6 +22,7 @@ defmodule Arbiter.Retrieval.RetrievalTrace do
   def changeset(retrieval_trace, attrs) do
     retrieval_trace
     |> cast(attrs, [
+      :agent_run_id,
       :tool,
       :query,
       :applied_filter,
@@ -31,6 +32,7 @@ defmodule Arbiter.Retrieval.RetrievalTrace do
       :policy_version
     ])
     |> validate_required([
+      :agent_run_id,
       :tool,
       :query,
       :applied_filter,

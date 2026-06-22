@@ -24,6 +24,8 @@ defmodule Arbiter.Policy.PolicyDecision do
   def changeset(policy_decision, attrs) do
     policy_decision
     |> cast(attrs, [
+      :tenant_id,
+      :user_id,
       :action,
       :resource_type,
       :resource_id,
@@ -34,6 +36,7 @@ defmodule Arbiter.Policy.PolicyDecision do
       :resource_snapshot
     ])
     |> validate_required([
+      :tenant_id,
       :action,
       :resource_type,
       :decision,
