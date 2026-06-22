@@ -55,6 +55,7 @@ Contract definitions should include:
 
 - Prefer fast unit tests for pure core logic and focused integration tests for shell modules.
 - Keep infrastructure tests separate from the default test suite. Use `mix infra.test` for Testcontainers-backed checks that start real services such as PostgreSQL.
+- Treat `mix test --cover` as coverage for the default fast suite. When DB persistence tests move under `test_infra/`, verify that boundary with `mix infra.test` instead of expecting those modules to stay covered by the fast suite.
 - Before implementation, check requirements coverage: every contract should have normal, deny, failure, fail-close, and tenant-isolation cases where relevant.
 - After tests are green and before refactoring, run coverage to find implementation that is not exercised by tests.
 - Use `mix test --cover` as the default coverage check for now. Add a dedicated coverage tool or CI threshold only when the project needs file-level reports or enforceable gates.

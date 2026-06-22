@@ -1,5 +1,5 @@
 defmodule Arbiter.AuditTest do
-  use Arbiter.DataCase, async: true
+  use Arbiter.DataCase, async: false
 
   alias Arbiter.Agents.AgentRun
   alias Arbiter.Audit
@@ -9,6 +9,13 @@ defmodule Arbiter.AuditTest do
   alias Arbiter.Retrieval.RetrievalTrace
   alias Arbiter.Tenants.Tenant
   alias Arbiter.Tenants.User
+
+  setup_all do
+    Ecto.Adapters.SQL.Sandbox.mode(Repo, :auto)
+    Ecto.Migrator.run(Repo, :up, all: true)
+    Ecto.Adapters.SQL.Sandbox.mode(Repo, :manual)
+    :ok
+  end
 
   describe "record_retrieval_decision/1" do
     test "records policy decision and retrieval trace in one audit transaction" do

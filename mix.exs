@@ -66,7 +66,7 @@ defmodule Arbiter.MixProject do
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
-      "infra.test": ["testcontainers.run test test_infra/postgres_outbox_test.exs"],
+      "infra.test": ["testcontainers.run test test_infra"],
       precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
     ]
   end

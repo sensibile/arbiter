@@ -1,5 +1,5 @@
 defmodule Arbiter.Sync.RevokeSimulationTest do
-  use Arbiter.DataCase, async: true
+  use Arbiter.DataCase, async: false
 
   alias Arbiter.Repo
   alias Arbiter.Sync.OutboxEvent
@@ -9,6 +9,13 @@ defmodule Arbiter.Sync.RevokeSimulationTest do
   alias Arbiter.Gateway
   alias Arbiter.Gateway.ToolCall
   alias Arbiter.Policy.Decision
+
+  setup_all do
+    Ecto.Adapters.SQL.Sandbox.mode(Repo, :auto)
+    Ecto.Migrator.run(Repo, :up, all: true)
+    Ecto.Adapters.SQL.Sandbox.mode(Repo, :manual)
+    :ok
+  end
 
   describe "revoke_user_access/2" do
     test "bumps user policy version and returns revoke-first invalidation commands" do

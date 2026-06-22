@@ -150,3 +150,5 @@ mix infra.test
 ```
 
 Infrastructure tests live outside the default `test/` tree under `test_infra/` so `mix test` remains fast and does not require Docker.
+
+Because persistence boundary tests are outside the default suite, `mix test --cover` only reflects fast core and gateway coverage. Use `mix infra.test` as the persistence-boundary verification gate.

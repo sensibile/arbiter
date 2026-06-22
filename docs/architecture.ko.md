@@ -150,3 +150,5 @@ mix infra.test
 ```
 
 Infrastructure test는 기본 `test/` 트리 밖의 `test_infra/`에 둡니다. 그래서 `mix test`는 빠르게 유지되고 Docker를 요구하지 않습니다.
+
+Persistence boundary test가 기본 suite 밖에 있으므로 `mix test --cover`는 fast core와 gateway coverage만 반영합니다. Persistence boundary 검증 gate로는 `mix infra.test`를 사용합니다.

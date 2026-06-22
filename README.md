@@ -59,6 +59,8 @@ Run infrastructure tests with Testcontainers-managed PostgreSQL:
 mix infra.test
 ```
 
+`mix test --cover` reports coverage for the default fast suite only. Persistence boundary coverage lives in `mix infra.test`.
+
 The app was generated API/domain-first without HTML/assets. If you start the endpoint, use:
 
 ```sh
