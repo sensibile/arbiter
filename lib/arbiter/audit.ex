@@ -10,26 +10,24 @@ defmodule Arbiter.Audit do
   alias Arbiter.Policy.PolicyDecision
   alias Arbiter.Repo
   alias Arbiter.Retrieval.RetrievalTrace
+  alias Ecto.Multi
 
   def record_retrieval_decision(event) when is_map(event) do
-    Repo.transaction(fn ->
-      policy_decision =
-        %PolicyDecision{}
-        |> PolicyDecision.changeset(policy_decision_attrs(event))
-        |> Repo.insert!()
-
-      retrieval_trace =
-        if record_retrieval_trace?(event) do
-          %RetrievalTrace{}
-          |> RetrievalTrace.changeset(retrieval_trace_attrs(event))
-          |> Repo.insert!()
-        end
-
-      %{policy_decision: policy_decision, retrieval_trace: retrieval_trace}
+    Multi.new()
+    |> Multi.insert(
+      :policy_decision,
+      PolicyDecision.changeset(%PolicyDecision{}, policy_decision_attrs(event))
+    )
+    |> Multi.run(:retrieval_trace, fn repo, _changes ->
+      if record_retrieval_trace?(event) do
+        %RetrievalTrace{}
+        |> RetrievalTrace.changeset(retrieval_trace_attrs(event))
+        |> repo.insert()
+      else
+        {:ok, nil}
+      end
     end)
-  rescue
-    exception in Ecto.InvalidChangesetError ->
-      {:error, failed_operation(exception.changeset), exception.changeset, %{}}
+    |> Repo.transaction()
   end
 
   def record_retrieval_decision(_event), do: {:error, :invalid_event}
@@ -77,10 +75,6 @@ defmodule Arbiter.Audit do
          fetch(event, :accepted_chunk_ids, []) != [] or
          fetch(event, :rejected_chunk_ids, []) != [])
   end
-
-  defp failed_operation(%Ecto.Changeset{data: %PolicyDecision{}}), do: :policy_decision
-  defp failed_operation(%Ecto.Changeset{data: %RetrievalTrace{}}), do: :retrieval_trace
-  defp failed_operation(%Ecto.Changeset{data: %AnswerLineage{}}), do: :answer_lineage
 
   defp fetch(map, key, default \\ nil) do
     Map.get(map, key, Map.get(map, Atom.to_string(key), default))

@@ -25,7 +25,8 @@ defmodule Arbiter.Gateway do
 
     with {:ok, tool} <- fetch_tool(tool_call, tools),
          {:ok, decision} <- authorize_call(tool_call, authorize),
-         :ok <- validate_tenant_scope(tool_call, decision) do
+         :ok <- validate_tenant_scope(tool_call, decision),
+         :ok <- validate_policy_snapshots(tool_call, decision) do
       route_tool_call(tool_call, tool, decision)
     else
       {:deny, %Decision{} = decision} ->
@@ -104,6 +105,42 @@ defmodule Arbiter.Gateway do
     else
       {:error,
        fail_closed(tool_call, decision, :tenant_scope_mismatch, ["tenant_scope_mismatch"])}
+    end
+  end
+
+  defp validate_policy_snapshots(%ToolCall{} = tool_call, %Decision{} = decision) do
+    with :ok <-
+           validate_snapshot_policy_version(
+             tool_call,
+             decision,
+             tool_call.user_snapshot,
+             :stale_user_policy_version
+           ),
+         :ok <-
+           validate_snapshot_policy_version(
+             tool_call,
+             decision,
+             tool_call.resource_snapshot,
+             :stale_resource_policy_version
+           ) do
+      :ok
+    end
+  end
+
+  defp validate_snapshot_policy_version(_tool_call, _decision, snapshot, _reason)
+       when not is_map(snapshot),
+       do: :ok
+
+  defp validate_snapshot_policy_version(tool_call, decision, snapshot, reason) do
+    case Map.get(snapshot, "policy_version", Map.get(snapshot, :policy_version)) do
+      nil ->
+        :ok
+
+      policy_version when policy_version == decision.policy_version ->
+        :ok
+
+      _stale_policy_version ->
+        {:error, fail_closed(tool_call, decision, reason, [Atom.to_string(reason)])}
     end
   end
 

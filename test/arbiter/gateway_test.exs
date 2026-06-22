@@ -123,6 +123,61 @@ defmodule Arbiter.GatewayTest do
       assert error.audit_event.status == "failed_closed"
     end
 
+    test "fails closed before execution when user policy snapshot is stale" do
+      test_pid = self()
+
+      execute = fn _guarded_query ->
+        send(test_pid, :executed)
+        {:ok, []}
+      end
+
+      tool_call =
+        tool_call(user_snapshot: %{"id" => "user_123", "policy_version" => "policy_v11"})
+
+      assert {:error, error} =
+               Gateway.run_tool_call(tool_call,
+                 tools: tools(execute),
+                 authorize: authorize(allow_decision())
+               )
+
+      refute_received :executed
+      assert error.reason == :stale_user_policy_version
+      assert error.audit_event.decision == "deny"
+      assert error.audit_event.reason == ["stale_user_policy_version"]
+      assert error.audit_event.policy_version == "policy_v12"
+      assert error.audit_event.status == "failed_closed"
+    end
+
+    test "fails closed before execution when resource policy snapshot is stale" do
+      test_pid = self()
+
+      execute = fn _guarded_query ->
+        send(test_pid, :executed)
+        {:ok, []}
+      end
+
+      tool_call =
+        tool_call(
+          resource_snapshot: %{
+            "resource_type" => "document_chunk",
+            "policy_version" => "policy_v11"
+          }
+        )
+
+      assert {:error, error} =
+               Gateway.run_tool_call(tool_call,
+                 tools: tools(execute),
+                 authorize: authorize(allow_decision())
+               )
+
+      refute_received :executed
+      assert error.reason == :stale_resource_policy_version
+      assert error.audit_event.decision == "deny"
+      assert error.audit_event.reason == ["stale_resource_policy_version"]
+      assert error.audit_event.policy_version == "policy_v12"
+      assert error.audit_event.status == "failed_closed"
+    end
+
     test "fails closed and audits when retrieved chunks cannot be validated" do
       execute = fn _guarded_query ->
         {:ok, [%{id: "chunk_1", tenant_id: "tenant_a"}]}
