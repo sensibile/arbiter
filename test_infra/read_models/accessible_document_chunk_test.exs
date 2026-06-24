@@ -3,8 +3,10 @@ defmodule Arbiter.ReadModels.AccessibleDocumentChunkTest do
 
   alias Arbiter.Documents.Chunk
   alias Arbiter.Documents.Document
+  alias Arbiter.Policy.Decision
   alias Arbiter.ReadModels
   alias Arbiter.ReadModels.AccessibleDocumentChunk
+  alias Arbiter.ReadModels.AccessibleDocumentChunkBuilder
   alias Arbiter.Repo
   alias Arbiter.Tenants.Tenant
   alias Arbiter.Tenants.User
@@ -104,6 +106,20 @@ defmodule Arbiter.ReadModels.AccessibleDocumentChunkTest do
       assert active_chunk_ids(tenant, user, "policy_v3") == [chunk.id]
     end
 
+    test "persists attrs produced by the pure projection builder" do
+      %{tenant: tenant, user: user, chunk: chunk} = fixture_scope(policy_version: "policy_v8")
+
+      assert {:ok, projection} =
+               build_and_put_projection(tenant, user, chunk,
+                 user_policy_version: "policy_v8",
+                 projected_at: @now,
+                 access_reason: ["department_match", "clearance_ok"]
+               )
+
+      assert projection.access_reason == ["department_match", "clearance_ok"]
+      assert active_chunk_ids(tenant, user, "policy_v8") == [chunk.id]
+    end
+
     test "fails closed for malformed lookup and invalidation scopes" do
       assert ReadModels.accessible_chunk_ids(%{}) == []
       assert ReadModels.accessible_chunk_ids(%{tenant_id: Ecto.UUID.generate()}) == []
@@ -138,6 +154,40 @@ defmodule Arbiter.ReadModels.AccessibleDocumentChunkTest do
       projected_at: Keyword.fetch!(attrs, :projected_at),
       invalidated_at: Keyword.get(attrs, :invalidated_at)
     })
+  end
+
+  defp build_and_put_projection(tenant, user, chunk, attrs) do
+    decision =
+      allow_decision(
+        tenant_id: tenant.id,
+        policy_version: Keyword.fetch!(attrs, :user_policy_version),
+        access_reason: Keyword.get(attrs, :access_reason, ["department_match"])
+      )
+
+    with {:ok, projection_attrs} <-
+           AccessibleDocumentChunkBuilder.build(
+             user,
+             chunk,
+             decision,
+             Keyword.fetch!(attrs, :projected_at)
+           ) do
+      projection_attrs
+      |> Map.put(:invalidated_at, Keyword.get(attrs, :invalidated_at))
+      |> ReadModels.put_accessible_document_chunk()
+    end
+  end
+
+  defp allow_decision(attrs) do
+    %Decision{
+      decision: :allow,
+      reason: Keyword.fetch!(attrs, :access_reason),
+      policy_version: Keyword.fetch!(attrs, :policy_version),
+      scope: %{
+        "tenant_id" => Keyword.fetch!(attrs, :tenant_id),
+        "departments" => ["finance"],
+        "max_sensitivity" => 3
+      }
+    }
   end
 
   defp fixture_scope(attrs) do

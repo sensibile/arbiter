@@ -151,6 +151,7 @@ The MVP currently includes:
 - `Arbiter.Sync.OutboxEvent` for persisted propagation commands.
 - `Arbiter.Sync.Outbox` for shaping invalidation command changesets.
 - `Arbiter.ReadModels.AccessibleDocumentChunk` for the first retrieval read model projection table.
+- `Arbiter.ReadModels.AccessibleDocumentChunkBuilder` for pure user/chunk/decision-to-projection attribute shaping.
 - `Arbiter.ReadModels` for projection upsert, active lookup, and user-policy invalidation.
 - `Arbiter.Sync.OutboxReadModelDispatch` for mapping user-access invalidation outbox events to read model commands.
 - Gateway stale snapshot checks for user and resource policy versions.

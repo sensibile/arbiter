@@ -84,12 +84,13 @@ Boundary rule:
 
 ### Read Model Boundary
 
-Owned by `Arbiter.ReadModels` and `Arbiter.ReadModels.AccessibleDocumentChunk`.
+Owned by `Arbiter.ReadModels`, `Arbiter.ReadModels.AccessibleDocumentChunk`, and `Arbiter.ReadModels.AccessibleDocumentChunkBuilder`.
 
 Responsibilities:
 
 - Persist `accessible_document_chunks` as the first runtime read model table.
 - Store user-to-chunk accessibility by `tenant_id`, `user_id`, `chunk_id`, and `user_policy_version`.
+- Build projection attributes from already-loaded user/chunk data and an allow policy decision through `Arbiter.ReadModels.AccessibleDocumentChunkBuilder`.
 - Copy `chunk_policy_version` and `chunk_deleted_at` into the projection so retrieval can filter stale or deleted chunks without re-running command-side joins.
 - Return active accessible chunk ids only when `tenant_id`, `user_id`, `user_policy_version`, `chunk_deleted_at IS NULL`, and `invalidated_at IS NULL` all match.
 - Invalidate a user's old projection rows when revoke bumps that user's policy version.
@@ -97,6 +98,7 @@ Responsibilities:
 Boundary rule:
 
 - `Arbiter.ReadModels` owns Repo queries and updates for projection storage.
+- `Arbiter.ReadModels.AccessibleDocumentChunkBuilder` must stay pure. It must not call Repo, clocks, vector stores, process workers, or external adapters.
 - Policy, retrieval guard, and gateway modules should consume read model results through injected functions or orchestration layers rather than calling this boundary directly.
 - `accessible_document_chunks` is derived storage. The command store remains authoritative, and stale, missing, deleted, or invalidated projection rows must not grant access.
 

@@ -84,12 +84,13 @@
 
 ### Read Model Boundary
 
-소유 모듈: `Arbiter.ReadModels`, `Arbiter.ReadModels.AccessibleDocumentChunk`
+소유 모듈: `Arbiter.ReadModels`, `Arbiter.ReadModels.AccessibleDocumentChunk`, `Arbiter.ReadModels.AccessibleDocumentChunkBuilder`
 
 책임:
 
 - 첫 runtime read model table인 `accessible_document_chunks`를 저장합니다.
 - `tenant_id`, `user_id`, `chunk_id`, `user_policy_version` 기준으로 user-to-chunk accessibility를 저장합니다.
+- 이미 로드된 user/chunk data와 allow policy decision으로부터 `Arbiter.ReadModels.AccessibleDocumentChunkBuilder`가 projection attrs를 생성합니다.
 - Retrieval이 command-side join을 다시 실행하지 않고 stale 또는 deleted chunk를 거를 수 있도록 `chunk_policy_version`과 `chunk_deleted_at`을 projection에 복사합니다.
 - `tenant_id`, `user_id`, `user_policy_version`, `chunk_deleted_at IS NULL`, `invalidated_at IS NULL`이 모두 일치할 때만 active accessible chunk id를 반환합니다.
 - Revoke가 user policy version을 증가시키면 해당 user의 이전 projection row를 invalidation합니다.
@@ -97,6 +98,7 @@
 경계 규칙:
 
 - `Arbiter.ReadModels`가 projection storage를 위한 Repo query와 update를 소유합니다.
+- `Arbiter.ReadModels.AccessibleDocumentChunkBuilder`는 순수 모듈로 유지해야 합니다. Repo, clock, vector store, process worker, external adapter를 호출하지 않아야 합니다.
 - Policy, retrieval guard, gateway 모듈은 이 boundary를 직접 호출하기보다 injected function 또는 orchestration layer를 통해 read model 결과를 사용해야 합니다.
 - `accessible_document_chunks`는 파생 저장소입니다. Command store가 authoritative source이며 stale, missing, deleted, invalidated projection row가 access grant가 되어서는 안 됩니다.
 
