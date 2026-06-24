@@ -22,12 +22,13 @@ defmodule Arbiter.Gateway do
   def run_tool_call(%ToolCall{} = tool_call, opts) when is_list(opts) do
     tools = Keyword.fetch!(opts, :tools)
     authorize = Keyword.fetch!(opts, :authorize)
+    accessible_chunk_ids = Keyword.get(opts, :accessible_chunk_ids)
 
     with {:ok, tool} <- fetch_tool(tool_call, tools),
          {:ok, decision} <- authorize_call(tool_call, authorize),
          :ok <- validate_tenant_scope(tool_call, decision),
          :ok <- validate_policy_snapshots(tool_call, decision) do
-      route_tool_call(tool_call, tool, decision)
+      route_tool_call(tool_call, tool, decision, accessible_chunk_ids)
     else
       {:deny, %Decision{} = decision} ->
         {:deny,
@@ -144,10 +145,18 @@ defmodule Arbiter.Gateway do
     end
   end
 
-  defp route_tool_call(tool_call, %{kind: :vector_retrieval, execute: execute}, decision) do
+  defp route_tool_call(
+         tool_call,
+         %{kind: :vector_retrieval, execute: execute},
+         decision,
+         accessible_chunk_ids
+       ) do
     with {:ok, guarded_query} <- Guard.guard_vector_query(tool_call.query, decision),
+         {:ok, guarded_query} <-
+           apply_read_model_scope(tool_call, decision, guarded_query, accessible_chunk_ids),
          {:ok, chunks} <- execute_guarded_query(execute, guarded_query),
          {:ok, guard_result} <- Guard.post_validate(chunks, decision),
+         :ok <- ensure_read_model_scope_respected(guarded_query, guard_result),
          :ok <- ensure_usable_retrieval_result(tool_call, decision, guard_result) do
       {:ok,
        %Result{
@@ -167,6 +176,59 @@ defmodule Arbiter.Gateway do
       {:error, guard_error} ->
         {:error,
          fail_closed(tool_call, decision, guard_error.reason, [Atom.to_string(guard_error.reason)])}
+    end
+  end
+
+  defp apply_read_model_scope(_tool_call, _decision, guarded_query, nil), do: {:ok, guarded_query}
+
+  defp apply_read_model_scope(tool_call, decision, guarded_query, accessible_chunk_ids)
+       when is_function(accessible_chunk_ids, 1) do
+    scope = %{
+      tenant_id: tool_call.tenant_id,
+      user_id: tool_call.user_id,
+      user_policy_version: decision.policy_version
+    }
+
+    case accessible_chunk_ids.(scope) do
+      chunk_ids when is_list(chunk_ids) ->
+        apply_allowed_chunk_ids(guarded_query, chunk_ids)
+
+      {:ok, chunk_ids} when is_list(chunk_ids) ->
+        apply_allowed_chunk_ids(guarded_query, chunk_ids)
+
+      {:error, _reason} ->
+        {:error, :read_model_scope_unavailable}
+
+      _invalid_shape ->
+        {:error, :invalid_read_model_scope}
+    end
+  end
+
+  defp apply_read_model_scope(_tool_call, _decision, _guarded_query, _accessible_chunk_ids) do
+    {:error, :invalid_read_model_scope_provider}
+  end
+
+  defp apply_allowed_chunk_ids(_guarded_query, []), do: {:error, :read_model_scope_empty}
+
+  defp apply_allowed_chunk_ids(guarded_query, chunk_ids) do
+    if Enum.all?(chunk_ids, &valid_chunk_id?/1) do
+      {:ok, %{guarded_query | allowed_chunk_ids: chunk_ids}}
+    else
+      {:error, :invalid_read_model_scope}
+    end
+  end
+
+  defp valid_chunk_id?(chunk_id), do: is_binary(chunk_id) and chunk_id != ""
+
+  defp ensure_read_model_scope_respected(%{allowed_chunk_ids: nil}, _guard_result), do: :ok
+
+  defp ensure_read_model_scope_respected(%{allowed_chunk_ids: allowed_chunk_ids}, guard_result) do
+    allowed_chunk_ids = MapSet.new(allowed_chunk_ids)
+
+    if Enum.all?(guard_result.accepted_chunk_ids, &MapSet.member?(allowed_chunk_ids, &1)) do
+      :ok
+    else
+      {:error, :read_model_scope_mismatch}
     end
   end
 

@@ -94,6 +94,129 @@ defmodule Arbiter.GatewayTest do
       assert result.audit_event.status == "denied"
     end
 
+    test "injects read model accessible chunk ids into the retrieval boundary" do
+      caller_query = %{
+        "text" => "renewal risk",
+        "allowed_chunk_ids" => ["caller_supplied_chunk"]
+      }
+
+      tool_call =
+        tool_call(
+          query: caller_query,
+          user_snapshot: %{
+            "id" => "user_123",
+            "tenant_id" => "tenant_a",
+            "policy_version" => "policy_v12"
+          }
+        )
+
+      test_pid = self()
+
+      accessible_chunk_ids = fn scope ->
+        send(test_pid, {:read_model_scope, scope})
+        {:ok, ["chunk_1"]}
+      end
+
+      execute = fn guarded_query ->
+        send(test_pid, {:executed, guarded_query})
+
+        {:ok,
+         [chunk("chunk_1", tenant_id: "tenant_a", department_id: "finance", sensitivity_level: 2)]}
+      end
+
+      assert {:ok, result} =
+               Gateway.run_tool_call(tool_call,
+                 tools: tools(execute),
+                 authorize: authorize(allow_decision()),
+                 accessible_chunk_ids: accessible_chunk_ids
+               )
+
+      assert_receive {:read_model_scope,
+                      %{
+                        tenant_id: "tenant_a",
+                        user_id: "user_123",
+                        user_policy_version: "policy_v12"
+                      }}
+
+      assert_receive {:executed, guarded_query}
+      assert guarded_query.allowed_chunk_ids == ["chunk_1"]
+      refute Map.has_key?(guarded_query.query, "allowed_chunk_ids")
+      assert Enum.map(result.allowed_chunks, & &1.id) == ["chunk_1"]
+    end
+
+    test "fails closed when retrieval adapter ignores read model chunk scope" do
+      execute = fn guarded_query ->
+        assert guarded_query.allowed_chunk_ids == ["chunk_1"]
+
+        {:ok,
+         [
+           chunk("chunk_2",
+             tenant_id: "tenant_a",
+             department_id: "finance",
+             sensitivity_level: 2
+           )
+         ]}
+      end
+
+      assert {:error, error} =
+               Gateway.run_tool_call(tool_call(),
+                 tools: tools(execute),
+                 authorize: authorize(allow_decision()),
+                 accessible_chunk_ids: fn _scope -> {:ok, ["chunk_1"]} end
+               )
+
+      assert_failed_closed(error, :read_model_scope_mismatch)
+    end
+
+    test "fails closed when read model scope provider cannot return usable ids" do
+      execute = fn _guarded_query -> {:ok, []} end
+
+      assert {:error, error} =
+               Gateway.run_tool_call(tool_call(),
+                 tools: tools(execute),
+                 authorize: authorize(allow_decision()),
+                 accessible_chunk_ids: fn _scope -> {:error, :db_unavailable} end
+               )
+
+      assert_failed_closed(error, :read_model_scope_unavailable)
+
+      assert {:error, error} =
+               Gateway.run_tool_call(tool_call(),
+                 tools: tools(execute),
+                 authorize: authorize(allow_decision()),
+                 accessible_chunk_ids: fn _scope -> [] end
+               )
+
+      assert_failed_closed(error, :read_model_scope_empty)
+
+      assert {:error, error} =
+               Gateway.run_tool_call(tool_call(),
+                 tools: tools(execute),
+                 authorize: authorize(allow_decision()),
+                 accessible_chunk_ids: fn _scope -> [""] end
+               )
+
+      assert_failed_closed(error, :invalid_read_model_scope)
+
+      assert {:error, error} =
+               Gateway.run_tool_call(tool_call(),
+                 tools: tools(execute),
+                 authorize: authorize(allow_decision()),
+                 accessible_chunk_ids: fn _scope -> :ok end
+               )
+
+      assert_failed_closed(error, :invalid_read_model_scope)
+
+      assert {:error, error} =
+               Gateway.run_tool_call(tool_call(),
+                 tools: tools(execute),
+                 authorize: authorize(allow_decision()),
+                 accessible_chunk_ids: :not_a_function
+               )
+
+      assert_failed_closed(error, :invalid_read_model_scope_provider)
+    end
+
     test "fails closed before execution when decision scope crosses tenants" do
       test_pid = self()
 

@@ -12,7 +12,7 @@ defmodule Arbiter.Retrieval.Guard do
   alias Arbiter.Retrieval.GuardedQuery
   alias Arbiter.Retrieval.GuardResult
 
-  @reserved_query_keys MapSet.new(["filter", :filter])
+  @reserved_query_keys MapSet.new(["filter", :filter, "allowed_chunk_ids", :allowed_chunk_ids])
 
   def guard_vector_query(query, %Decision{} = decision) when is_map(query) do
     with {:ok, applied_filter} <- ScopeCompiler.to_vector_filter(decision) do

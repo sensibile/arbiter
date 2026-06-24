@@ -61,7 +61,9 @@
 - 명시적인 registry에서 tool contract를 확인합니다.
 - 주입된 authorization 함수를 호출합니다.
 - tenant scope mismatch, stale user policy snapshot, stale resource policy snapshot, invalid filter, tool failure, retrieval validation failure를 fail-close 처리합니다.
+- 현재 tenant, user, policy version에 대해 접근 가능한 chunk id를 얻기 위해 선택적으로 주입된 read model scope 함수를 호출합니다.
 - Retrieval tool adapter에는 Arbiter가 guard한 query만 전달합니다.
+- Read model chunk allowlist는 `GuardedQuery.allowed_chunk_ids`로 retrieval adapter에 전달하며, 반환된 chunk가 이 allowlist를 무시하면 fail-close 처리합니다.
 - Audit boundary가 저장할 audit event data를 반환합니다.
 
 경계 규칙:
@@ -143,6 +145,8 @@ Arbiter는 Event Sourcing 대신 current-state CQRS를 사용합니다.
 
 - 권한 없는 chunk는 prompt context에 들어가기 전에 제외됩니다.
 - 호출자가 제공한 retrieval filter는 Arbiter scope filter로 대체됩니다.
+- 호출자가 제공한 read model allowlist는 retrieval adapter 실행 전에 제거됩니다.
+- 주입된 read model chunk allowlist가 있으면 retrieval adapter 결과는 그 allowlist 안에 있어야 합니다.
 - 검색된 chunk는 decision policy version 기준으로 post-validation됩니다.
 - Policy deny decision은 tool을 실행하지 않습니다.
 - Tenant scope mismatch는 fail-close됩니다.

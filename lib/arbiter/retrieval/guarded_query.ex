@@ -4,5 +4,5 @@ defmodule Arbiter.Retrieval.GuardedQuery do
   """
 
   @enforce_keys [:query, :applied_filter, :policy_version]
-  defstruct [:query, :applied_filter, :policy_version]
+  defstruct [:query, :applied_filter, :policy_version, allowed_chunk_ids: nil]
 end

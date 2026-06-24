@@ -73,6 +73,8 @@ Projection tables and caches are derived storage. They may be rebuilt from comma
 
 The first implemented read model table is `accessible_document_chunks`. It stores active user-to-chunk access snapshots keyed by tenant, user, chunk, and user policy version. Retrieval lookups must filter on tenant, user, user policy version, `chunk_deleted_at IS NULL`, and `invalidated_at IS NULL`.
 
+The first gateway integration is intentionally small: `Arbiter.Gateway` accepts an injected read model scope function and passes the returned chunk ids to retrieval adapters through `GuardedQuery.allowed_chunk_ids`. Gateway does not call `Arbiter.ReadModels` or `Arbiter.Repo` directly. If the provider is unavailable, returns an invalid shape, returns an empty scope, or the retrieval adapter returns chunks outside the allowlist, Gateway fails closed.
+
 ### Audit and Lineage
 
 Audit tables record what happened:
@@ -155,3 +157,4 @@ The MVP currently includes:
 - `Arbiter.ReadModels` for projection upsert, active lookup, and user-policy invalidation.
 - `Arbiter.Sync.OutboxReadModelDispatch` for mapping user-access invalidation outbox events to read model commands.
 - Gateway stale snapshot checks for user and resource policy versions.
+- Gateway read model scope injection for passing accessible chunk ids to retrieval adapters without introducing a direct Repo/read-model dependency in the hot-path core.
