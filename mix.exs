@@ -106,6 +106,8 @@ defmodule Arbiter.MixProject do
       Arbiter.Documents.Document,
       Arbiter.Policy.Policy,
       Arbiter.Policy.PolicyDecision,
+      Arbiter.ReadModels,
+      Arbiter.ReadModels.AccessibleDocumentChunk,
       Arbiter.Retrieval.RetrievalTrace,
       Arbiter.Sync.Outbox,
       Arbiter.Sync.OutboxEvent,

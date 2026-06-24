@@ -71,6 +71,8 @@ Gateway and retrieval code may read from projection tables, vector metadata, and
 
 Projection tables and caches are derived storage. They may be rebuilt from command-state tables, and they must not introduce access grants that are absent from the command store.
 
+The first implemented read model table is `accessible_document_chunks`. It stores active user-to-chunk access snapshots keyed by tenant, user, chunk, and user policy version. Retrieval lookups must filter on tenant, user, user policy version, `chunk_deleted_at IS NULL`, and `invalidated_at IS NULL`.
+
 ### Audit and Lineage
 
 Audit tables record what happened:
@@ -148,4 +150,6 @@ The MVP currently includes:
 - `Arbiter.Sync.RevokeSimulation` for user policy version bumps.
 - `Arbiter.Sync.OutboxEvent` for persisted propagation commands.
 - `Arbiter.Sync.Outbox` for shaping invalidation command changesets.
+- `Arbiter.ReadModels.AccessibleDocumentChunk` for the first retrieval read model projection table.
+- `Arbiter.ReadModels` for projection upsert, active lookup, and user-policy invalidation.
 - Gateway stale snapshot checks for user and resource policy versions.

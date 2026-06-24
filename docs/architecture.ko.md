@@ -82,6 +82,24 @@
 
 - `Arbiter.Audit`은 audit record를 위한 Repo transaction을 소유합니다. Policy decision과 retrieval guard result는 이 boundary에 들어오기 전에 이미 데이터로 구성되어 있어야 합니다.
 
+### Read Model Boundary
+
+소유 모듈: `Arbiter.ReadModels`, `Arbiter.ReadModels.AccessibleDocumentChunk`
+
+책임:
+
+- 첫 runtime read model table인 `accessible_document_chunks`를 저장합니다.
+- `tenant_id`, `user_id`, `chunk_id`, `user_policy_version` 기준으로 user-to-chunk accessibility를 저장합니다.
+- Retrieval이 command-side join을 다시 실행하지 않고 stale 또는 deleted chunk를 거를 수 있도록 `chunk_policy_version`과 `chunk_deleted_at`을 projection에 복사합니다.
+- `tenant_id`, `user_id`, `user_policy_version`, `chunk_deleted_at IS NULL`, `invalidated_at IS NULL`이 모두 일치할 때만 active accessible chunk id를 반환합니다.
+- Revoke가 user policy version을 증가시키면 해당 user의 이전 projection row를 invalidation합니다.
+
+경계 규칙:
+
+- `Arbiter.ReadModels`가 projection storage를 위한 Repo query와 update를 소유합니다.
+- Policy, retrieval guard, gateway 모듈은 이 boundary를 직접 호출하기보다 injected function 또는 orchestration layer를 통해 read model 결과를 사용해야 합니다.
+- `accessible_document_chunks`는 파생 저장소입니다. Command store가 authoritative source이며 stale, missing, deleted, invalidated projection row가 access grant가 되어서는 안 됩니다.
+
 ### Sync/Revoke와 Outbox Consumer Boundary
 
 소유 모듈: `Arbiter.Sync.RevokeSimulation`, `Arbiter.Sync.Outbox`, `Arbiter.Sync.OutboxEvent`, `Arbiter.Sync.OutboxConsumerCommand`, `Arbiter.Sync.OutboxConsumer`
@@ -113,6 +131,7 @@ Arbiter는 Event Sourcing 대신 current-state CQRS를 사용합니다.
 - Outbox row는 propagation command이며 source of truth가 아닙니다.
 - Revoke path는 비동기 projection refresh를 기다리지 않기 위해 policy version 증가와 stale-snapshot fail-close 동작을 사용합니다.
 - Outbox 처리는 `pending -> processing -> processed | failed`를 사용합니다. 현재 구현은 supervised background worker가 아니라 claim/mark skeleton입니다.
+- `accessible_document_chunks`는 retrieval filtering을 위한 첫 구현 read model table입니다. Active lookup은 tenant, user, user policy version, chunk deletion state, revoke invalidation state로 scope됩니다.
 
 ## Fail-Closed 불변식
 
@@ -143,6 +162,8 @@ mix xref trace lib/arbiter/gateway.ex --label compile
 ```
 
 더 강한 경계 enforcement가 필요하면 `:boundary` 라이브러리를 검토합니다. 이 라이브러리는 module group, 허용 dependency, export module을 정의하고 compilation 중 forbidden call을 보고할 수 있습니다. 첫 적용 후보는 깊은 `Arbiter.Policy`와 `Arbiter.Retrieval` 모듈이 `Arbiter.Repo`를 호출하지 못하게 막는 규칙입니다.
+
+현재 boundary 검토는 [Architecture Boundary Review](architecture-boundaries.ko.md)에 기록되어 있습니다. 현재 `compile-connected` graph 기준으로 `:boundary` 도입은 다음 external adapter 또는 worker slice까지 보류하되, 적용할 규칙 후보는 명시해 둡니다.
 
 ## Infrastructure Test
 

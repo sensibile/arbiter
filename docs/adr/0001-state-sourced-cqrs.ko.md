@@ -71,6 +71,8 @@ Gateway와 retrieval 코드는 tenant와 policy-version context가 현재 comman
 
 Projection table과 cache는 파생 저장소입니다. Command-state table에서 다시 만들 수 있어야 하며, command store에 없는 access grant를 새로 만들어서는 안 됩니다.
 
+첫 구현 read model table은 `accessible_document_chunks`입니다. 이 table은 tenant, user, chunk, user policy version을 key로 active user-to-chunk access snapshot을 저장합니다. Retrieval lookup은 tenant, user, user policy version, `chunk_deleted_at IS NULL`, `invalidated_at IS NULL` 조건으로 filter해야 합니다.
+
 ### Audit and Lineage
 
 Audit table은 발생한 일을 기록합니다.
@@ -148,4 +150,6 @@ MVP에는 현재 다음 구현이 포함되어 있습니다.
 - User policy version 증가를 담당하는 `Arbiter.Sync.RevokeSimulation`
 - Persisted propagation command를 위한 `Arbiter.Sync.OutboxEvent`
 - Invalidation command changeset을 구성하는 `Arbiter.Sync.Outbox`
+- 첫 retrieval read model projection table인 `Arbiter.ReadModels.AccessibleDocumentChunk`
+- Projection upsert, active lookup, user-policy invalidation을 담당하는 `Arbiter.ReadModels`
 - User/resource policy version에 대한 Gateway stale snapshot check

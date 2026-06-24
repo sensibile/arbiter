@@ -82,6 +82,24 @@ Boundary rule:
 
 - `Arbiter.Audit` owns Repo transactions for audit records. Policy decisions and retrieval guard results should already be shaped before entering this boundary.
 
+### Read Model Boundary
+
+Owned by `Arbiter.ReadModels` and `Arbiter.ReadModels.AccessibleDocumentChunk`.
+
+Responsibilities:
+
+- Persist `accessible_document_chunks` as the first runtime read model table.
+- Store user-to-chunk accessibility by `tenant_id`, `user_id`, `chunk_id`, and `user_policy_version`.
+- Copy `chunk_policy_version` and `chunk_deleted_at` into the projection so retrieval can filter stale or deleted chunks without re-running command-side joins.
+- Return active accessible chunk ids only when `tenant_id`, `user_id`, `user_policy_version`, `chunk_deleted_at IS NULL`, and `invalidated_at IS NULL` all match.
+- Invalidate a user's old projection rows when revoke bumps that user's policy version.
+
+Boundary rule:
+
+- `Arbiter.ReadModels` owns Repo queries and updates for projection storage.
+- Policy, retrieval guard, and gateway modules should consume read model results through injected functions or orchestration layers rather than calling this boundary directly.
+- `accessible_document_chunks` is derived storage. The command store remains authoritative, and stale, missing, deleted, or invalidated projection rows must not grant access.
+
 ### Sync/Revoke and Outbox Consumer Boundary
 
 Owned by `Arbiter.Sync.RevokeSimulation`, `Arbiter.Sync.Outbox`, `Arbiter.Sync.OutboxEvent`, `Arbiter.Sync.OutboxConsumerCommand`, and `Arbiter.Sync.OutboxConsumer`.
@@ -113,6 +131,7 @@ Arbiter uses current-state CQRS rather than Event Sourcing.
 - Outbox rows are propagation commands, not the source of truth.
 - Revoke paths use policy version bumps plus stale-snapshot fail-close behavior to avoid waiting for asynchronous projection refreshes.
 - Outbox processing uses `pending -> processing -> processed | failed`; the current implementation provides the claim/mark skeleton, not a supervised background worker.
+- `accessible_document_chunks` is the first implemented read model table for retrieval filtering. Active lookups are scoped by tenant, user, user policy version, chunk deletion state, and revoke invalidation state.
 
 ## Fail-Closed Invariants
 
@@ -143,6 +162,8 @@ mix xref trace lib/arbiter/gateway.ex --label compile
 ```
 
 For stronger boundary enforcement, evaluate the `:boundary` library. It can define module groups, allowed dependencies, and exported modules, then report forbidden calls during compilation. A good first target would be preventing deep `Arbiter.Policy` and `Arbiter.Retrieval` modules from calling `Arbiter.Repo`.
+
+The current boundary review is documented in [Architecture Boundary Review](architecture-boundaries.md). Based on the current `compile-connected` graph, `:boundary` should be deferred until the next external adapter or worker slice, but the proposed rules are now explicit.
 
 ## Infrastructure Tests
 
