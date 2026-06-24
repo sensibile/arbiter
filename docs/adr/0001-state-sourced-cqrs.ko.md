@@ -55,6 +55,22 @@ Arbiter는 **current-state CQRS와 transactional outbox**를 사용합니다.
 
 Projection key에는 `tenant_id`, `user_id`, `policy_version`, resource/action dimension처럼 tenant와 policy-version context가 포함되어야 합니다.
 
+Read model 저장소 계약은 다음과 같습니다.
+
+| Write-side 변경 | Outbox command | Command status | Read model 대상 | 조회 형태 |
+| --- | --- | --- | --- | --- |
+| User membership, role, status, clearance, policy-version 변경 | `invalidate_user_access_cache` | 구현된 MVP command | User access projection table/cache | `tenant_id`, `user_id`, `policy_version` |
+| User membership, role, status, clearance, policy-version 변경 | `rebuild_user_access_projection` | 계획된 projection command | User access projection table/cache | `tenant_id`, `user_id`, `policy_version` |
+| Policy DSL, policy version, scope에 영향을 주는 tenant 설정 변경 | `rebuild_policy_scope_projection` | 계획된 projection command | Policy scope projection table/cache | `tenant_id`, `policy_id`, `resource_type`, `action`, `policy_version` |
+| Tool permission 또는 tool contract 변경 | `invalidate_tool_result_cache` | 구현된 MVP command | Tool permission projection/cache | `tenant_id`, `user_id`, `tool`, `action`, `policy_version` |
+| Tool permission 또는 tool contract 변경 | `rebuild_tool_permission_projection` | 계획된 projection command | Tool permission projection/cache | `tenant_id`, `user_id`, `tool`, `action`, `policy_version` |
+| Document, chunk, ACL, classification, deletion, metadata 변경 | `invalidate_retrieval_result_cache` | 구현된 MVP command | Chunk access metadata table과 vector/search metadata index | `tenant_id`, `chunk_id`, `document_id`, `policy_version`, access metadata |
+| Document, chunk, ACL, classification, deletion, metadata 변경 | `refresh_chunk_access_metadata` | 계획된 projection command | Chunk access metadata table과 vector/search metadata index | `tenant_id`, `chunk_id`, `document_id`, `policy_version`, access metadata |
+
+Gateway와 retrieval 코드는 tenant와 policy-version context가 현재 command-store 상태 또는 신뢰 가능한 snapshot과 일치할 때만 projection table, vector metadata, cache entry를 읽을 수 있습니다. Projection이 없거나 stale이거나 실패한 상태이면 보안에 민감한 읽기는 deny/fail-closed 조건입니다.
+
+Projection table과 cache는 파생 저장소입니다. Command-state table에서 다시 만들 수 있어야 하며, command store에 없는 access grant를 새로 만들어서는 안 됩니다.
+
 ### Audit and Lineage
 
 Audit table은 발생한 일을 기록합니다.
@@ -75,6 +91,20 @@ Outbox table은 propagation work를 기록합니다.
 - vector/search metadata refresh request
 
 Outbox row는 해당 propagation을 요구하는 current-state 변경과 같은 database transaction 안에서 기록됩니다.
+
+Outbox 처리는 작은 상태 기계를 따릅니다.
+
+```text
+pending
+→ processing
+→ processed | failed
+```
+
+Outbox consumer boundary는 사용 가능한 `pending` row를 claim하고, lock timestamp와 증가한 attempt count와 함께 `processing`으로 표시합니다. 이후 projection/cache/index adapter를 실행하고 row를 `processed` 또는 `failed`로 표시합니다. 순수 consumer command는 다음 row 상태를 결정하고, Repo boundary는 row locking, transaction, persistence를 소유합니다.
+
+Terminal marking은 claim ownership을 증명해야 합니다. 현재 skeleton은 claim한 row의 `id`, `attempts`, `locked_at`을 ownership token으로 사용합니다. 이후 worker에서 관측성이 더 필요하면 명시적인 worker id나 lock token을 schema에 추가할 수 있습니다.
+
+Projector는 idempotent해야 합니다. Outbox는 at-least-once propagation mechanism이므로 동일한 command를 다시 처리해도 read model state가 같은 결과로 수렴해야 합니다.
 
 ## Revoke-First 규칙
 

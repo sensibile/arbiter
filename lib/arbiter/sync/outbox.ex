@@ -21,7 +21,7 @@ defmodule Arbiter.Sync.Outbox do
       aggregate_type: "user",
       aggregate_id: Map.fetch!(command, :user_id),
       payload: stringify_payload(command),
-      status: "pending",
+      status: OutboxEvent.status_pending(),
       attempts: 0,
       available_at: available_at
     })

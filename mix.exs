@@ -109,6 +109,7 @@ defmodule Arbiter.MixProject do
       Arbiter.Retrieval.RetrievalTrace,
       Arbiter.Sync.Outbox,
       Arbiter.Sync.OutboxEvent,
+      Arbiter.Sync.OutboxConsumer,
       Arbiter.Sync.RevokeSimulation,
       Arbiter.Tenants.Group,
       Arbiter.Tenants.Membership,

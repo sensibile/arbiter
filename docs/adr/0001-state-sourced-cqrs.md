@@ -55,6 +55,22 @@ Future projection tables should optimize gateway and retrieval reads:
 
 Projection keys must include tenant and policy-version context, such as `tenant_id`, `user_id`, `policy_version`, and resource/action dimensions.
 
+The read model storage contract is:
+
+| Write-side change | Outbox command | Command status | Read model target | Lookup shape |
+| --- | --- | --- | --- | --- |
+| User membership, role, status, clearance, or policy-version change | `invalidate_user_access_cache` | Implemented MVP command | User access projection table/cache | `tenant_id`, `user_id`, `policy_version` |
+| User membership, role, status, clearance, or policy-version change | `rebuild_user_access_projection` | Planned projection command | User access projection table/cache | `tenant_id`, `user_id`, `policy_version` |
+| Policy DSL, policy version, or scope-relevant tenant setting change | `rebuild_policy_scope_projection` | Planned projection command | Policy scope projection table/cache | `tenant_id`, `policy_id`, `resource_type`, `action`, `policy_version` |
+| Tool permission or tool contract change | `invalidate_tool_result_cache` | Implemented MVP command | Tool permission projection/cache | `tenant_id`, `user_id`, `tool`, `action`, `policy_version` |
+| Tool permission or tool contract change | `rebuild_tool_permission_projection` | Planned projection command | Tool permission projection/cache | `tenant_id`, `user_id`, `tool`, `action`, `policy_version` |
+| Document, chunk, ACL, classification, deletion, or metadata change | `invalidate_retrieval_result_cache` | Implemented MVP command | Chunk access metadata table and vector/search metadata index | `tenant_id`, `chunk_id`, `document_id`, `policy_version`, access metadata |
+| Document, chunk, ACL, classification, deletion, or metadata change | `refresh_chunk_access_metadata` | Planned projection command | Chunk access metadata table and vector/search metadata index | `tenant_id`, `chunk_id`, `document_id`, `policy_version`, access metadata |
+
+Gateway and retrieval code may read from projection tables, vector metadata, and cache entries only when the tenant and policy-version context matches the current command-store state or a trusted snapshot. A missing, stale, or failed projection is a deny/fail-closed condition for security-sensitive reads.
+
+Projection tables and caches are derived storage. They may be rebuilt from command-state tables, and they must not introduce access grants that are absent from the command store.
+
 ### Audit and Lineage
 
 Audit tables record what happened:
@@ -75,6 +91,20 @@ Outbox tables record propagation work:
 - vector/search metadata refresh requests
 
 Outbox rows are written in the same database transaction as the current-state change that requires them.
+
+Outbox processing follows a small state machine:
+
+```text
+pending
+→ processing
+→ processed | failed
+```
+
+The outbox consumer boundary claims available `pending` rows, marks them `processing` with a lock timestamp and incremented attempt count, executes the matching projection/cache/index adapter, then marks the row `processed` or `failed`. The pure consumer command decides the next row state; the Repo boundary owns row locking, transactions, and persistence.
+
+Terminal marking must prove claim ownership. The current skeleton uses the claimed row's `id`, `attempts`, and `locked_at` as the ownership token; a later worker may replace that with an explicit worker id or lock token if the schema needs stronger observability.
+
+Projectors must be idempotent. Reprocessing an equivalent command must converge on the same read model state, because the outbox is an at-least-once propagation mechanism.
 
 ## Revoke-First Rule
 

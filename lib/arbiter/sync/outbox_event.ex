@@ -4,13 +4,19 @@ defmodule Arbiter.Sync.OutboxEvent do
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
+  @status_pending "pending"
+  @status_processing "processing"
+  @status_processed "processed"
+  @status_failed "failed"
+  @statuses [@status_pending, @status_processing, @status_processed, @status_failed]
+  @terminal_statuses [@status_processed, @status_failed]
 
   schema "sync_outbox_events" do
     field :event_type, :string
     field :aggregate_type, :string
     field :aggregate_id, :binary_id
     field :payload, :map, default: %{}
-    field :status, :string, default: "pending"
+    field :status, :string, default: @status_pending
     field :attempts, :integer, default: 0
     field :available_at, :utc_datetime
     field :locked_at, :utc_datetime
@@ -21,6 +27,13 @@ defmodule Arbiter.Sync.OutboxEvent do
 
     timestamps(type: :utc_datetime)
   end
+
+  def status_pending, do: @status_pending
+  def status_processing, do: @status_processing
+  def status_processed, do: @status_processed
+  def status_failed, do: @status_failed
+  def statuses, do: @statuses
+  def terminal_statuses, do: @terminal_statuses
 
   def changeset(outbox_event, attrs) do
     outbox_event
@@ -47,7 +60,7 @@ defmodule Arbiter.Sync.OutboxEvent do
       :attempts,
       :available_at
     ])
-    |> validate_inclusion(:status, ["pending", "processing", "processed", "failed"])
+    |> validate_inclusion(:status, @statuses)
     |> validate_number(:attempts, greater_than_or_equal_to: 0)
   end
 end

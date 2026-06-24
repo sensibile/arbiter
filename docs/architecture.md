@@ -82,9 +82,9 @@ Boundary rule:
 
 - `Arbiter.Audit` owns Repo transactions for audit records. Policy decisions and retrieval guard results should already be shaped before entering this boundary.
 
-### Sync/Revoke Boundary
+### Sync/Revoke and Outbox Consumer Boundary
 
-Owned by `Arbiter.Sync.RevokeSimulation`, `Arbiter.Sync.Outbox`, and `Arbiter.Sync.OutboxEvent`.
+Owned by `Arbiter.Sync.RevokeSimulation`, `Arbiter.Sync.Outbox`, `Arbiter.Sync.OutboxEvent`, `Arbiter.Sync.OutboxConsumerCommand`, and `Arbiter.Sync.OutboxConsumer`.
 
 Responsibilities:
 
@@ -94,10 +94,14 @@ Responsibilities:
 - Return cache invalidation commands for user access, tool results, and retrieval results.
 - Persist outbox rows for those invalidation commands in the same transaction as the policy version bump.
 - Return a revoke audit event shape.
+- Decide outbox row state transitions as pure data through `Arbiter.Sync.OutboxConsumerCommand`.
+- Claim available `pending` outbox rows and persist `processing`, `processed`, or `failed` status changes through `Arbiter.Sync.OutboxConsumer`.
+- Mark claimed rows as terminal only when the persisted `id`, `attempts`, and `locked_at` still match the claimed row.
 
 Boundary rule:
 
-- This boundary persists propagation commands as outbox rows. Real cache/process adapters and workers should remain outside the policy and retrieval core.
+- This boundary persists propagation commands as outbox rows and owns outbox status persistence. Real cache/process adapters and background workers should remain outside the policy and retrieval core.
+- `Arbiter.Sync.OutboxConsumerCommand` must not call Repo, clocks, processes, cache adapters, or vector/search adapters. Callers pass timestamps in as data.
 
 ### Storage Strategy
 
@@ -108,6 +112,7 @@ Arbiter uses current-state CQRS rather than Event Sourcing.
 - Audit records are lineage, not replayable command state.
 - Outbox rows are propagation commands, not the source of truth.
 - Revoke paths use policy version bumps plus stale-snapshot fail-close behavior to avoid waiting for asynchronous projection refreshes.
+- Outbox processing uses `pending -> processing -> processed | failed`; the current implementation provides the claim/mark skeleton, not a supervised background worker.
 
 ## Fail-Closed Invariants
 

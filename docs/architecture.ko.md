@@ -82,9 +82,9 @@
 
 - `Arbiter.Audit`은 audit record를 위한 Repo transaction을 소유합니다. Policy decision과 retrieval guard result는 이 boundary에 들어오기 전에 이미 데이터로 구성되어 있어야 합니다.
 
-### Sync/Revoke Boundary
+### Sync/Revoke와 Outbox Consumer Boundary
 
-소유 모듈: `Arbiter.Sync.RevokeSimulation`, `Arbiter.Sync.Outbox`, `Arbiter.Sync.OutboxEvent`
+소유 모듈: `Arbiter.Sync.RevokeSimulation`, `Arbiter.Sync.Outbox`, `Arbiter.Sync.OutboxEvent`, `Arbiter.Sync.OutboxConsumerCommand`, `Arbiter.Sync.OutboxConsumer`
 
 책임:
 
@@ -94,10 +94,14 @@
 - User access, tool result, retrieval result cache invalidation command를 반환합니다.
 - Policy version 증가와 같은 transaction 안에서 invalidation command outbox row를 저장합니다.
 - Revoke audit event shape를 반환합니다.
+- `Arbiter.Sync.OutboxConsumerCommand`를 통해 outbox row 상태 전이를 순수 데이터로 결정합니다.
+- `Arbiter.Sync.OutboxConsumer`를 통해 사용 가능한 `pending` outbox row를 claim하고 `processing`, `processed`, `failed` 상태 변경을 저장합니다.
+- Persisted `id`, `attempts`, `locked_at`이 claim한 row와 여전히 일치할 때만 claimed row를 terminal 상태로 표시합니다.
 
 경계 규칙:
 
-- 이 boundary는 propagation command를 outbox row로 저장합니다. 실제 cache/process adapter와 worker는 policy와 retrieval core 바깥에 두어야 합니다.
+- 이 boundary는 propagation command를 outbox row로 저장하고 outbox status persistence를 소유합니다. 실제 cache/process adapter와 background worker는 policy와 retrieval core 바깥에 두어야 합니다.
+- `Arbiter.Sync.OutboxConsumerCommand`는 Repo, clock, process, cache adapter, vector/search adapter를 호출하지 않아야 합니다. 호출자가 timestamp를 데이터로 전달합니다.
 
 ### 저장소 전략
 
@@ -108,6 +112,7 @@ Arbiter는 Event Sourcing 대신 current-state CQRS를 사용합니다.
 - Audit record는 lineage이며 replay 가능한 command state가 아닙니다.
 - Outbox row는 propagation command이며 source of truth가 아닙니다.
 - Revoke path는 비동기 projection refresh를 기다리지 않기 위해 policy version 증가와 stale-snapshot fail-close 동작을 사용합니다.
+- Outbox 처리는 `pending -> processing -> processed | failed`를 사용합니다. 현재 구현은 supervised background worker가 아니라 claim/mark skeleton입니다.
 
 ## Fail-Closed 불변식
 
