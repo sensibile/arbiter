@@ -106,7 +106,7 @@ Outbox consumer boundary는 사용 가능한 `pending` row를 claim하고, lock 
 
 Terminal marking은 claim ownership을 증명해야 합니다. 현재 skeleton은 claim한 row의 `id`, `attempts`, `locked_at`을 ownership token으로 사용합니다. 이후 worker에서 관측성이 더 필요하면 명시적인 worker id나 lock token을 schema에 추가할 수 있습니다.
 
-Projector는 idempotent해야 합니다. Outbox는 at-least-once propagation mechanism이므로 동일한 command를 다시 처리해도 read model state가 같은 결과로 수렴해야 합니다.
+Outbox consumer가 호출하는 projection/cache/index adapter는 idempotent해야 합니다. Outbox는 at-least-once propagation mechanism이므로 동일한 command를 다시 처리해도 read model state가 같은 결과로 수렴해야 합니다.
 
 ## Revoke-First 규칙
 

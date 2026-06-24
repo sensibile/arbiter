@@ -53,11 +53,7 @@ defmodule Arbiter.ReadModels.AccessibleDocumentChunkTest do
                  projected_at: @now
                )
 
-      assert ReadModels.accessible_chunk_ids(%{
-               tenant_id: tenant.id,
-               user_id: user.id,
-               user_policy_version: "policy_v7"
-             }) == [chunk.id]
+      assert active_chunk_ids(tenant, user, "policy_v7") == [chunk.id]
     end
 
     test "revoke invalidation removes old user policy projections from active lookup" do
@@ -70,20 +66,12 @@ defmodule Arbiter.ReadModels.AccessibleDocumentChunkTest do
                  projected_at: @now
                )
 
-      assert ReadModels.accessible_chunk_ids(%{
-               tenant_id: tenant.id,
-               user_id: user.id,
-               user_policy_version: "policy_v12"
-             }) == [chunk.id]
+      assert active_chunk_ids(tenant, user, "policy_v12") == [chunk.id]
 
       assert {:ok, 1} =
                ReadModels.invalidate_user_access(tenant.id, user.id, "policy_v12", @now)
 
-      assert ReadModels.accessible_chunk_ids(%{
-               tenant_id: tenant.id,
-               user_id: user.id,
-               user_policy_version: "policy_v12"
-             }) == []
+      assert active_chunk_ids(tenant, user, "policy_v12") == []
 
       assert Repo.get!(AccessibleDocumentChunk, projection.id).invalidated_at == @now
     end
@@ -113,12 +101,28 @@ defmodule Arbiter.ReadModels.AccessibleDocumentChunkTest do
       assert refreshed_projection.invalidated_at == nil
       assert refreshed_projection.access_reason == ["department_match", "clearance_ok"]
 
-      assert ReadModels.accessible_chunk_ids(%{
-               tenant_id: tenant.id,
-               user_id: user.id,
-               user_policy_version: "policy_v3"
-             }) == [chunk.id]
+      assert active_chunk_ids(tenant, user, "policy_v3") == [chunk.id]
     end
+
+    test "fails closed for malformed lookup and invalidation scopes" do
+      assert ReadModels.accessible_chunk_ids(%{}) == []
+      assert ReadModels.accessible_chunk_ids(%{tenant_id: Ecto.UUID.generate()}) == []
+
+      assert ReadModels.invalidate_user_access(
+               Ecto.UUID.generate(),
+               Ecto.UUID.generate(),
+               "policy_v1",
+               "not-a-datetime"
+             ) == {:error, :invalid_invalidation_scope}
+    end
+  end
+
+  defp active_chunk_ids(tenant, user, user_policy_version) do
+    ReadModels.accessible_chunk_ids(%{
+      tenant_id: tenant.id,
+      user_id: user.id,
+      user_policy_version: user_policy_version
+    })
   end
 
   defp put_projection(tenant, user, document, chunk, attrs) do

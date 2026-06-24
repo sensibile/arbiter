@@ -106,7 +106,7 @@ The outbox consumer boundary claims available `pending` rows, marks them `proces
 
 Terminal marking must prove claim ownership. The current skeleton uses the claimed row's `id`, `attempts`, and `locked_at` as the ownership token; a later worker may replace that with an explicit worker id or lock token if the schema needs stronger observability.
 
-Projectors must be idempotent. Reprocessing an equivalent command must converge on the same read model state, because the outbox is an at-least-once propagation mechanism.
+Projection/cache/index adapters invoked by the outbox consumer must be idempotent. Reprocessing an equivalent command must converge on the same read model state, because the outbox is an at-least-once propagation mechanism.
 
 ## Revoke-First Rule
 

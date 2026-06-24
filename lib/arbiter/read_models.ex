@@ -49,6 +49,8 @@ defmodule Arbiter.ReadModels do
     |> Repo.all()
   end
 
+  def accessible_chunk_ids(_invalid_scope), do: []
+
   def invalidate_user_access(
         tenant_id,
         user_id,
@@ -65,4 +67,7 @@ defmodule Arbiter.ReadModels do
 
     {:ok, count}
   end
+
+  def invalidate_user_access(_tenant_id, _user_id, _user_policy_version, _invalidated_at),
+    do: {:error, :invalid_invalidation_scope}
 end
