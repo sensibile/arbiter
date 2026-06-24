@@ -102,7 +102,7 @@ Boundary rule:
 
 ### Sync/Revoke and Outbox Consumer Boundary
 
-Owned by `Arbiter.Sync.RevokeSimulation`, `Arbiter.Sync.Outbox`, `Arbiter.Sync.OutboxEvent`, `Arbiter.Sync.OutboxConsumerCommand`, and `Arbiter.Sync.OutboxConsumer`.
+Owned by `Arbiter.Sync.RevokeSimulation`, `Arbiter.Sync.Outbox`, `Arbiter.Sync.OutboxEvent`, `Arbiter.Sync.OutboxConsumerCommand`, `Arbiter.Sync.OutboxReadModelDispatch`, and `Arbiter.Sync.OutboxConsumer`.
 
 Responsibilities:
 
@@ -115,11 +115,13 @@ Responsibilities:
 - Decide outbox row state transitions as pure data through `Arbiter.Sync.OutboxConsumerCommand`.
 - Claim available `pending` outbox rows and persist `processing`, `processed`, or `failed` status changes through `Arbiter.Sync.OutboxConsumer`.
 - Mark claimed rows as terminal only when the persisted `id`, `attempts`, and `locked_at` still match the claimed row.
+- Dispatch `invalidate_user_access_cache` events to `Arbiter.ReadModels.invalidate_user_access/4` so old `accessible_document_chunks` rows are invalidated after revoke.
 
 Boundary rule:
 
 - This boundary persists propagation commands as outbox rows and owns outbox status persistence. Real cache/process adapters and background workers should remain outside the policy and retrieval core.
 - `Arbiter.Sync.OutboxConsumerCommand` must not call Repo, clocks, processes, cache adapters, or vector/search adapters. Callers pass timestamps in as data.
+- `Arbiter.Sync.OutboxReadModelDispatch` must stay pure. It validates event payloads and returns read model commands, but does not call `Arbiter.Repo` or `Arbiter.ReadModels`.
 
 ### Storage Strategy
 

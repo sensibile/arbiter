@@ -1,10 +1,15 @@
 defmodule Arbiter.Sync.OutboxConsumerTest do
   use Arbiter.DataCase, async: false
 
+  alias Arbiter.Documents.Chunk
+  alias Arbiter.Documents.Document
+  alias Arbiter.ReadModels
+  alias Arbiter.ReadModels.AccessibleDocumentChunk
   alias Arbiter.Repo
   alias Arbiter.Sync.OutboxConsumer
   alias Arbiter.Sync.OutboxEvent
   alias Arbiter.Tenants.Tenant
+  alias Arbiter.Tenants.User
 
   @now ~U[2026-06-24 01:02:03Z]
 
@@ -85,6 +90,64 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
     end
   end
 
+  describe "process_read_model_event/2" do
+    test "invalidates old user access projections and marks claimed event processed" do
+      %{tenant: tenant, user: user, document: document, chunk: chunk} =
+        read_model_fixture_scope(policy_version: "policy_v12")
+
+      assert {:ok, projection} =
+               ReadModels.put_accessible_document_chunk(%{
+                 tenant_id: tenant.id,
+                 user_id: user.id,
+                 chunk_id: chunk.id,
+                 document_id: document.id,
+                 user_policy_version: "policy_v12",
+                 chunk_policy_version: chunk.policy_version,
+                 chunk_deleted_at: nil,
+                 access_reason: ["department_match"],
+                 projected_at: @now
+               })
+
+      event =
+        tenant
+        |> outbox_event_fixture(
+          aggregate_id: user.id,
+          payload: %{
+            "command" => "invalidate_user_access_cache",
+            "tenant_id" => tenant.id,
+            "user_id" => user.id,
+            "previous_policy_version" => "policy_v12",
+            "current_policy_version" => "policy_v13"
+          }
+        )
+        |> claim!()
+
+      assert {:ok, processed_event} = OutboxConsumer.process_read_model_event(event, now: @now)
+      assert processed_event.status == "processed"
+
+      assert Repo.get!(AccessibleDocumentChunk, projection.id).invalidated_at == @now
+
+      assert ReadModels.accessible_chunk_ids(%{
+               tenant_id: tenant.id,
+               user_id: user.id,
+               user_policy_version: "policy_v12"
+             }) == []
+    end
+
+    test "marks unsupported read model events failed" do
+      tenant = tenant_fixture()
+
+      event =
+        tenant
+        |> outbox_event_fixture(event_type: "invalidate_tool_result_cache")
+        |> claim!()
+
+      assert {:error, failed_event} = OutboxConsumer.process_read_model_event(event, now: @now)
+      assert failed_event.status == "failed"
+      assert failed_event.last_error == "unsupported_read_model_command"
+    end
+  end
+
   defp claim!(event) do
     assert {:ok, [claimed]} = OutboxConsumer.claim_available(1, now: @now)
     assert claimed.id == event.id
@@ -116,5 +179,46 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
     %OutboxEvent{}
     |> OutboxEvent.changeset(Map.new(attrs))
     |> Repo.insert!()
+  end
+
+  defp read_model_fixture_scope(attrs) do
+    tenant = tenant_fixture()
+
+    user =
+      %User{tenant_id: tenant.id}
+      |> User.changeset(%{
+        email: "outbox-read-model-user-#{System.unique_integer([:positive])}@example.com",
+        role: "analyst",
+        department_ids: ["finance"],
+        clearance_level: 2,
+        policy_version: Keyword.fetch!(attrs, :policy_version)
+      })
+      |> Repo.insert!()
+
+    document =
+      %Document{tenant_id: tenant.id}
+      |> Document.changeset(%{
+        source: "gdrive",
+        department_id: "finance",
+        classification: "internal",
+        sensitivity_level: 1,
+        status: "active",
+        acl_version: "acl_v1"
+      })
+      |> Repo.insert!()
+
+    chunk =
+      %Chunk{tenant_id: tenant.id, document_id: document.id}
+      |> Chunk.changeset(%{
+        text: "renewal risk",
+        department_id: "finance",
+        sensitivity_level: 1,
+        visibility: "department",
+        acl_version: "acl_v1",
+        policy_version: Keyword.fetch!(attrs, :policy_version)
+      })
+      |> Repo.insert!()
+
+    %{tenant: tenant, user: user, document: document, chunk: chunk}
   end
 end

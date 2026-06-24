@@ -152,4 +152,5 @@ MVP에는 현재 다음 구현이 포함되어 있습니다.
 - Invalidation command changeset을 구성하는 `Arbiter.Sync.Outbox`
 - 첫 retrieval read model projection table인 `Arbiter.ReadModels.AccessibleDocumentChunk`
 - Projection upsert, active lookup, user-policy invalidation을 담당하는 `Arbiter.ReadModels`
+- User-access invalidation outbox event를 read model command로 매핑하는 `Arbiter.Sync.OutboxReadModelDispatch`
 - User/resource policy version에 대한 Gateway stale snapshot check

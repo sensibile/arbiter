@@ -9,8 +9,10 @@ defmodule Arbiter.Sync.OutboxConsumer do
   import Ecto.Query
 
   alias Arbiter.Repo
+  alias Arbiter.ReadModels
   alias Arbiter.Sync.OutboxConsumerCommand
   alias Arbiter.Sync.OutboxEvent
+  alias Arbiter.Sync.OutboxReadModelDispatch
 
   def claim_available(limit, opts \\ [])
 
@@ -45,6 +47,15 @@ defmodule Arbiter.Sync.OutboxConsumer do
     update_claimed_from_command(event, OutboxConsumerCommand.mark_failed(event, error, now))
   end
 
+  def process_read_model_event(%OutboxEvent{} = event, opts \\ []) do
+    now = Keyword.get_lazy(opts, :now, &default_now/0)
+
+    event
+    |> OutboxReadModelDispatch.command(now)
+    |> execute_read_model_command()
+    |> mark_processed_or_failed(event, now)
+  end
+
   defp claim_event!(event, now) do
     {:ok, attrs} = OutboxConsumerCommand.claim(event, now)
 
@@ -71,6 +82,26 @@ defmodule Arbiter.Sync.OutboxConsumer do
   end
 
   defp update_claimed_from_command(_event, {:error, reason}), do: {:error, reason}
+
+  defp execute_read_model_command({:ok, %{operation: :invalidate_user_access} = command}) do
+    ReadModels.invalidate_user_access(
+      command.tenant_id,
+      command.user_id,
+      command.user_policy_version,
+      command.invalidated_at
+    )
+  end
+
+  defp execute_read_model_command({:error, reason}), do: {:error, reason}
+
+  defp mark_processed_or_failed({:ok, _result}, event, now), do: mark_processed(event, now: now)
+
+  defp mark_processed_or_failed({:error, reason}, event, now) do
+    case mark_failed(event, reason, now: now) do
+      {:ok, failed_event} -> {:error, failed_event}
+      {:error, mark_reason} -> {:error, mark_reason}
+    end
+  end
 
   defp default_now do
     DateTime.utc_now()
