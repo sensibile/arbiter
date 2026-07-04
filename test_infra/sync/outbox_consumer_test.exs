@@ -1,15 +1,13 @@
 defmodule Arbiter.Sync.OutboxConsumerTest do
   use Arbiter.DataCase, async: false
 
-  alias Arbiter.Documents.Chunk
-  alias Arbiter.Documents.Document
   alias Arbiter.ReadModels
   alias Arbiter.ReadModels.AccessibleDocumentChunk
   alias Arbiter.Repo
   alias Arbiter.Sync.OutboxConsumer
   alias Arbiter.Sync.OutboxEvent
-  alias Arbiter.Tenants.Tenant
-  alias Arbiter.Tenants.User
+
+  import Arbiter.SyncFixtures
 
   @now ~U[2026-06-24 01:02:03Z]
 
@@ -22,7 +20,7 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
 
   describe "claim_available/2" do
     test "claims available pending rows in PostgreSQL" do
-      tenant = tenant_fixture()
+      tenant = tenant_fixture("outbox-consumer-tenant")
       ready = outbox_event_fixture(tenant, available_at: ~U[2026-06-24 01:00:00Z])
       _future = outbox_event_fixture(tenant, available_at: ~U[2026-06-24 01:05:00Z])
 
@@ -45,7 +43,7 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
 
   describe "mark_processed/2 and mark_failed/3" do
     test "persists terminal states for claimed rows" do
-      tenant = tenant_fixture()
+      tenant = tenant_fixture("outbox-consumer-tenant")
 
       processed_event =
         tenant
@@ -71,7 +69,7 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
     end
 
     test "rejects terminal marking before claim" do
-      tenant = tenant_fixture()
+      tenant = tenant_fixture("outbox-consumer-tenant")
       event = outbox_event_fixture(tenant)
 
       assert OutboxConsumer.mark_processed(event, now: @now) == {:error, :not_processing}
@@ -79,7 +77,7 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
     end
 
     test "rejects terminal marking when claim ownership does not match" do
-      tenant = tenant_fixture()
+      tenant = tenant_fixture("outbox-consumer-tenant")
 
       claimed =
         tenant
@@ -95,7 +93,7 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
     end
 
     test "rejects failed marking when claim ownership does not match" do
-      tenant = tenant_fixture()
+      tenant = tenant_fixture("outbox-consumer-tenant")
 
       claimed =
         tenant
@@ -116,7 +114,7 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
   describe "process_read_model_event/2" do
     test "invalidates old user access projections and marks claimed event processed" do
       %{tenant: tenant, user: user, document: document, chunk: chunk} =
-        read_model_fixture_scope(policy_version: "policy_v12")
+        read_model_fixture_scope(prefix: "outbox-consumer", policy_version: "policy_v12")
 
       assert {:ok, projection} =
                ReadModels.put_accessible_document_chunk(%{
@@ -135,13 +133,7 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
         tenant
         |> outbox_event_fixture(
           aggregate_id: user.id,
-          payload: %{
-            "command" => "invalidate_user_access_cache",
-            "tenant_id" => tenant.id,
-            "user_id" => user.id,
-            "previous_policy_version" => "policy_v12",
-            "current_policy_version" => "policy_v13"
-          }
+          payload: invalidate_user_access_payload(tenant.id, user.id, "policy_v12", "policy_v13")
         )
         |> claim!()
 
@@ -158,7 +150,7 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
     end
 
     test "marks unsupported read model events failed" do
-      tenant = tenant_fixture()
+      tenant = tenant_fixture("outbox-consumer-tenant")
 
       event =
         tenant
@@ -175,73 +167,5 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
     assert {:ok, [claimed]} = OutboxConsumer.claim_available(1, now: @now)
     assert claimed.id == event.id
     claimed
-  end
-
-  defp tenant_fixture do
-    %Tenant{}
-    |> Tenant.changeset(%{name: "outbox-consumer-tenant-#{System.unique_integer([:positive])}"})
-    |> Repo.insert!()
-  end
-
-  defp outbox_event_fixture(tenant, attrs \\ []) do
-    attrs =
-      Keyword.merge(
-        [
-          tenant_id: tenant.id,
-          event_type: "invalidate_user_access_cache",
-          aggregate_type: "user",
-          aggregate_id: Ecto.UUID.generate(),
-          payload: %{"cache_key" => "user_access"},
-          status: OutboxEvent.status_pending(),
-          attempts: 0,
-          available_at: @now
-        ],
-        attrs
-      )
-
-    %OutboxEvent{}
-    |> OutboxEvent.changeset(Map.new(attrs))
-    |> Repo.insert!()
-  end
-
-  defp read_model_fixture_scope(attrs) do
-    tenant = tenant_fixture()
-
-    user =
-      %User{tenant_id: tenant.id}
-      |> User.changeset(%{
-        email: "outbox-read-model-user-#{System.unique_integer([:positive])}@example.com",
-        role: "analyst",
-        department_ids: ["finance"],
-        clearance_level: 2,
-        policy_version: Keyword.fetch!(attrs, :policy_version)
-      })
-      |> Repo.insert!()
-
-    document =
-      %Document{tenant_id: tenant.id}
-      |> Document.changeset(%{
-        source: "gdrive",
-        department_id: "finance",
-        classification: "internal",
-        sensitivity_level: 1,
-        status: "active",
-        acl_version: "acl_v1"
-      })
-      |> Repo.insert!()
-
-    chunk =
-      %Chunk{tenant_id: tenant.id, document_id: document.id}
-      |> Chunk.changeset(%{
-        text: "renewal risk",
-        department_id: "finance",
-        sensitivity_level: 1,
-        visibility: "department",
-        acl_version: "acl_v1",
-        policy_version: Keyword.fetch!(attrs, :policy_version)
-      })
-      |> Repo.insert!()
-
-    %{tenant: tenant, user: user, document: document, chunk: chunk}
   end
 end

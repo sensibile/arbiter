@@ -1,15 +1,13 @@
 defmodule Arbiter.Sync.OutboxProcessorTest do
   use Arbiter.DataCase, async: false
 
-  alias Arbiter.Documents.Chunk
-  alias Arbiter.Documents.Document
   alias Arbiter.ReadModels
   alias Arbiter.ReadModels.AccessibleDocumentChunk
   alias Arbiter.Repo
   alias Arbiter.Sync.OutboxEvent
   alias Arbiter.Sync.OutboxProcessor
-  alias Arbiter.Tenants.Tenant
-  alias Arbiter.Tenants.User
+
+  import Arbiter.SyncFixtures
 
   @now ~U[2026-06-24 02:00:00Z]
 
@@ -27,13 +25,13 @@ defmodule Arbiter.Sync.OutboxProcessorTest do
     end
 
     test "supports a one-argument processing pass with the default clock" do
-      tenant = tenant_fixture()
+      tenant = tenant_fixture("outbox-processor-tenant")
       user_id = Ecto.UUID.generate()
 
       event =
         outbox_event_fixture(tenant,
           aggregate_id: user_id,
-          payload: invalidate_payload(tenant.id, user_id, "policy_v1", "policy_v2"),
+          payload: invalidate_user_access_payload(tenant.id, user_id, "policy_v1", "policy_v2"),
           available_at: ~U[2000-01-01 00:00:00Z]
         )
 
@@ -45,7 +43,7 @@ defmodule Arbiter.Sync.OutboxProcessorTest do
 
     test "claims pending read model invalidation events and processes them" do
       %{tenant: tenant, user: user, document: document, chunk: chunk} =
-        read_model_fixture_scope(policy_version: "policy_v12")
+        read_model_fixture_scope(prefix: "outbox-processor", policy_version: "policy_v12")
 
       assert {:ok, projection} =
                ReadModels.put_accessible_document_chunk(%{
@@ -63,7 +61,7 @@ defmodule Arbiter.Sync.OutboxProcessorTest do
       event =
         outbox_event_fixture(tenant,
           aggregate_id: user.id,
-          payload: invalidate_payload(tenant.id, user.id, "policy_v12", "policy_v13")
+          payload: invalidate_user_access_payload(tenant.id, user.id, "policy_v12", "policy_v13")
         )
 
       assert {:ok,
@@ -87,20 +85,20 @@ defmodule Arbiter.Sync.OutboxProcessorTest do
     end
 
     test "honors the claim limit and leaves later rows pending" do
-      tenant = tenant_fixture()
+      tenant = tenant_fixture("outbox-processor-tenant")
       user_id = Ecto.UUID.generate()
 
       first =
         outbox_event_fixture(tenant,
           aggregate_id: user_id,
-          payload: invalidate_payload(tenant.id, user_id, "policy_v1", "policy_v2"),
+          payload: invalidate_user_access_payload(tenant.id, user_id, "policy_v1", "policy_v2"),
           available_at: ~U[2026-06-24 01:00:00Z]
         )
 
       second =
         outbox_event_fixture(tenant,
           aggregate_id: user_id,
-          payload: invalidate_payload(tenant.id, user_id, "policy_v2", "policy_v3"),
+          payload: invalidate_user_access_payload(tenant.id, user_id, "policy_v2", "policy_v3"),
           available_at: ~U[2026-06-24 01:01:00Z]
         )
 
@@ -112,7 +110,7 @@ defmodule Arbiter.Sync.OutboxProcessorTest do
     end
 
     test "marks unsupported read model events failed without aborting the pass" do
-      tenant = tenant_fixture()
+      tenant = tenant_fixture("outbox-processor-tenant")
       user_id = Ecto.UUID.generate()
 
       unsupported =
@@ -125,7 +123,7 @@ defmodule Arbiter.Sync.OutboxProcessorTest do
       supported =
         outbox_event_fixture(tenant,
           aggregate_id: user_id,
-          payload: invalidate_payload(tenant.id, user_id, "policy_v3", "policy_v4")
+          payload: invalidate_user_access_payload(tenant.id, user_id, "policy_v3", "policy_v4")
         )
 
       assert {:ok,
@@ -154,81 +152,4 @@ defmodule Arbiter.Sync.OutboxProcessorTest do
     end
   end
 
-  defp invalidate_payload(tenant_id, user_id, previous_policy_version, current_policy_version) do
-    %{
-      "command" => "invalidate_user_access_cache",
-      "tenant_id" => tenant_id,
-      "user_id" => user_id,
-      "previous_policy_version" => previous_policy_version,
-      "current_policy_version" => current_policy_version
-    }
-  end
-
-  defp tenant_fixture do
-    %Tenant{}
-    |> Tenant.changeset(%{"name" => "outbox-processor-tenant-#{System.unique_integer([:positive])}"})
-    |> Repo.insert!()
-  end
-
-  defp outbox_event_fixture(tenant, attrs) do
-    attrs =
-      Keyword.merge(
-        [
-          tenant_id: tenant.id,
-          event_type: "invalidate_user_access_cache",
-          aggregate_type: "user",
-          aggregate_id: Ecto.UUID.generate(),
-          payload: %{"cache_key" => "user_access"},
-          status: OutboxEvent.status_pending(),
-          attempts: 0,
-          available_at: @now
-        ],
-        attrs
-      )
-
-    %OutboxEvent{}
-    |> OutboxEvent.changeset(Map.new(attrs))
-    |> Repo.insert!()
-  end
-
-  defp read_model_fixture_scope(attrs) do
-    tenant = tenant_fixture()
-
-    user =
-      %User{tenant_id: tenant.id}
-      |> User.changeset(%{
-        email: "outbox-processor-user-#{System.unique_integer([:positive])}@example.com",
-        role: "analyst",
-        department_ids: ["finance"],
-        clearance_level: 2,
-        policy_version: Keyword.fetch!(attrs, :policy_version)
-      })
-      |> Repo.insert!()
-
-    document =
-      %Document{tenant_id: tenant.id}
-      |> Document.changeset(%{
-        source: "gdrive",
-        department_id: "finance",
-        classification: "internal",
-        sensitivity_level: 1,
-        status: "active",
-        acl_version: "acl_v1"
-      })
-      |> Repo.insert!()
-
-    chunk =
-      %Chunk{tenant_id: tenant.id, document_id: document.id}
-      |> Chunk.changeset(%{
-        text: "renewal risk",
-        department_id: "finance",
-        sensitivity_level: 1,
-        visibility: "department",
-        acl_version: "acl_v1",
-        policy_version: Keyword.fetch!(attrs, :policy_version)
-      })
-      |> Repo.insert!()
-
-    %{tenant: tenant, user: user, document: document, chunk: chunk}
-  end
 end
