@@ -41,6 +41,19 @@ defmodule Arbiter.Policy.ScopeCompilerTest do
       assert error.reason == :invalid_scope
     end
 
+    test "rejects malformed scope values" do
+      decision = %Decision{
+        decision: :allow,
+        reason: ["same_tenant"],
+        policy_version: "policy_v12",
+        scope: "tenant_a"
+      }
+
+      assert {:error, error} = ScopeCompiler.to_sql_predicate(decision)
+      assert error.reason == :invalid_scope
+      assert error.message == "scope must be a map"
+    end
+
     test "rejects non-decision inputs" do
       assert {:error, error} = ScopeCompiler.to_sql_predicate(%{})
       assert error.reason == :invalid_decision

@@ -145,6 +145,13 @@ defmodule Arbiter.ReadModels.AccessibleDocumentChunkBuilderTest do
 
       assert AccessibleDocumentChunkBuilder.build(
                user(),
+               Map.delete(chunk(), :sensitivity_level),
+               allow_decision(),
+               @projected_at
+             ) == {:error, :missing_sensitivity_level}
+
+      assert AccessibleDocumentChunkBuilder.build(
+               user(),
                Map.delete(chunk(), :deleted_at),
                allow_decision(),
                @projected_at

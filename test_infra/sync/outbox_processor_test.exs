@@ -21,6 +21,28 @@ defmodule Arbiter.Sync.OutboxProcessorTest do
   end
 
   describe "run_once/2" do
+    test "returns an empty summary when no rows are available" do
+      assert {:ok, %{claimed: 0, processed: 0, failed: 0, errors: 0, results: []}} =
+               OutboxProcessor.run_once(10, now: @now)
+    end
+
+    test "supports a one-argument processing pass with the default clock" do
+      tenant = tenant_fixture()
+      user_id = Ecto.UUID.generate()
+
+      event =
+        outbox_event_fixture(tenant,
+          aggregate_id: user_id,
+          payload: invalidate_payload(tenant.id, user_id, "policy_v1", "policy_v2"),
+          available_at: ~U[2000-01-01 00:00:00Z]
+        )
+
+      assert {:ok, %{claimed: 1, processed: 1, failed: 0, errors: 0}} =
+               OutboxProcessor.run_once(1)
+
+      assert Repo.get!(OutboxEvent, event.id).status == OutboxEvent.status_processed()
+    end
+
     test "claims pending read model invalidation events and processes them" do
       %{tenant: tenant, user: user, document: document, chunk: chunk} =
         read_model_fixture_scope(policy_version: "policy_v12")

@@ -81,7 +81,7 @@ defmodule Arbiter.AuditTest do
         "decision" => "deny",
         "reason" => ["retrieval_validation_failed"],
         "policy_version" => "policy_v12",
-        "retrieved_chunk_ids" => [rejected_chunk_id],
+        "retrieved_chunk_ids" => [],
         "accepted_chunk_ids" => [],
         "rejected_chunk_ids" => [rejected_chunk_id],
         "applied_filter" => %{},

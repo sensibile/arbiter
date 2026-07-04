@@ -36,6 +36,11 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
 
       assert Repo.get!(OutboxEvent, ready.id).status == "processing"
     end
+
+    test "rejects invalid claim limits" do
+      assert OutboxConsumer.claim_available(0, now: @now) == {:error, :invalid_limit}
+      assert OutboxConsumer.claim_available("1", now: @now) == {:error, :invalid_limit}
+    end
   end
 
   describe "mark_processed/2 and mark_failed/3" do
@@ -86,6 +91,24 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
       |> Repo.update!()
 
       assert OutboxConsumer.mark_processed(claimed, now: @now) == {:error, :claim_mismatch}
+      assert Repo.get!(OutboxEvent, claimed.id).status == "processing"
+    end
+
+    test "rejects failed marking when claim ownership does not match" do
+      tenant = tenant_fixture()
+
+      claimed =
+        tenant
+        |> outbox_event_fixture()
+        |> claim!()
+
+      claimed
+      |> OutboxEvent.changeset(%{attempts: claimed.attempts + 1})
+      |> Repo.update!()
+
+      assert OutboxConsumer.mark_failed(claimed, :adapter_unavailable, now: @now) ==
+               {:error, :claim_mismatch}
+
       assert Repo.get!(OutboxEvent, claimed.id).status == "processing"
     end
   end
