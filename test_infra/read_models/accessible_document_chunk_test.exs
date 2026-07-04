@@ -1,15 +1,13 @@
 defmodule Arbiter.ReadModels.AccessibleDocumentChunkTest do
   use Arbiter.DataCase, async: false
 
-  alias Arbiter.Documents.Chunk
-  alias Arbiter.Documents.Document
   alias Arbiter.Policy.Decision
   alias Arbiter.ReadModels
   alias Arbiter.ReadModels.AccessibleDocumentChunk
   alias Arbiter.ReadModels.AccessibleDocumentChunkBuilder
   alias Arbiter.Repo
-  alias Arbiter.Tenants.Tenant
-  alias Arbiter.Tenants.User
+
+  import Arbiter.DomainFixtures
 
   @now ~U[2026-06-24 10:00:00Z]
 
@@ -191,55 +189,17 @@ defmodule Arbiter.ReadModels.AccessibleDocumentChunkTest do
   end
 
   defp fixture_scope(attrs) do
-    tenant = tenant_fixture()
+    tenant = tenant_fixture("read-model-tenant")
 
     user =
-      %User{tenant_id: tenant.id}
-      |> User.changeset(%{
+      user_fixture(tenant,
         email: "read-model-user-#{System.unique_integer([:positive])}@example.com",
-        role: "analyst",
-        department_ids: ["finance"],
-        clearance_level: 2,
         policy_version: Keyword.fetch!(attrs, :policy_version)
-      })
-      |> Repo.insert!()
+      )
 
     document = document_fixture(tenant)
     chunk = chunk_fixture(tenant, document, policy_version: Keyword.fetch!(attrs, :policy_version))
 
     %{tenant: tenant, user: user, document: document, chunk: chunk}
-  end
-
-  defp tenant_fixture do
-    %Tenant{}
-    |> Tenant.changeset(%{name: "read-model-tenant-#{System.unique_integer([:positive])}"})
-    |> Repo.insert!()
-  end
-
-  defp document_fixture(tenant) do
-    %Document{tenant_id: tenant.id}
-    |> Document.changeset(%{
-      source: "gdrive",
-      department_id: "finance",
-      classification: "internal",
-      sensitivity_level: 1,
-      status: "active",
-      acl_version: "acl_v1"
-    })
-    |> Repo.insert!()
-  end
-
-  defp chunk_fixture(tenant, document, attrs) do
-    %Chunk{tenant_id: tenant.id, document_id: document.id}
-    |> Chunk.changeset(%{
-      text: "renewal risk",
-      department_id: "finance",
-      sensitivity_level: 1,
-      visibility: "department",
-      acl_version: "acl_v1",
-      policy_version: Keyword.get(attrs, :policy_version, "policy_v7"),
-      deleted_at: Keyword.get(attrs, :deleted_at)
-    })
-    |> Repo.insert!()
   end
 end

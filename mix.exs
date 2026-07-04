@@ -114,6 +114,7 @@ defmodule Arbiter.MixProject do
       Arbiter.Sync.OutboxConsumer,
       Arbiter.Sync.OutboxProcessor,
       Arbiter.Sync.RevokeSimulation,
+      Arbiter.DomainFixtures,
       Arbiter.SyncFixtures,
       Arbiter.Tenants.Group,
       Arbiter.Tenants.Membership,

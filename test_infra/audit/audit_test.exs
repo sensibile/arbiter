@@ -1,14 +1,13 @@
 defmodule Arbiter.AuditTest do
   use Arbiter.DataCase, async: false
 
-  alias Arbiter.Agents.AgentRun
   alias Arbiter.Audit
   alias Arbiter.Audit.AnswerLineage
   alias Arbiter.Policy.PolicyDecision
   alias Arbiter.Repo
   alias Arbiter.Retrieval.RetrievalTrace
-  alias Arbiter.Tenants.Tenant
-  alias Arbiter.Tenants.User
+
+  import Arbiter.DomainFixtures
 
   setup_all do
     Ecto.Adapters.SQL.Sandbox.mode(Repo, :auto)
@@ -230,23 +229,9 @@ defmodule Arbiter.AuditTest do
   end
 
   defp fixture_scope do
-    tenant =
-      %Tenant{}
-      |> Tenant.changeset(%{name: "tenant-#{System.unique_integer([:positive])}"})
-      |> Repo.insert!()
-
-    user =
-      %User{tenant_id: tenant.id}
-      |> User.changeset(%{
-        email: "user-#{System.unique_integer([:positive])}@example.com",
-        role: "analyst"
-      })
-      |> Repo.insert!()
-
-    agent_run =
-      %AgentRun{tenant_id: tenant.id, user_id: user.id}
-      |> AgentRun.changeset(%{question: "What changed?"})
-      |> Repo.insert!()
+    tenant = tenant_fixture("audit-tenant")
+    user = user_fixture(tenant, email: "audit-user-#{System.unique_integer([:positive])}@example.com")
+    agent_run = agent_run_fixture(tenant, user)
 
     %{tenant: tenant, user: user, agent_run: agent_run}
   end

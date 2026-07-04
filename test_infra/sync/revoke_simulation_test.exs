@@ -4,11 +4,12 @@ defmodule Arbiter.Sync.RevokeSimulationTest do
   alias Arbiter.Repo
   alias Arbiter.Sync.OutboxEvent
   alias Arbiter.Sync.RevokeSimulation
-  alias Arbiter.Tenants.Tenant
   alias Arbiter.Tenants.User
   alias Arbiter.Gateway
   alias Arbiter.Gateway.ToolCall
   alias Arbiter.Policy.Decision
+
+  import Arbiter.DomainFixtures
 
   setup_all do
     Ecto.Adapters.SQL.Sandbox.mode(Repo, :auto)
@@ -176,19 +177,13 @@ defmodule Arbiter.Sync.RevokeSimulationTest do
   end
 
   defp fixture_scope(attrs) do
-    tenant =
-      %Tenant{}
-      |> Tenant.changeset(%{name: "tenant-#{System.unique_integer([:positive])}"})
-      |> Repo.insert!()
+    tenant = tenant_fixture("revoke-tenant")
 
     user =
-      %User{tenant_id: tenant.id}
-      |> User.changeset(%{
-        email: "user-#{System.unique_integer([:positive])}@example.com",
-        role: "analyst",
+      user_fixture(tenant,
+        email: "revoke-user-#{System.unique_integer([:positive])}@example.com",
         policy_version: Keyword.fetch!(attrs, :policy_version)
-      })
-      |> Repo.insert!()
+      )
 
     %{tenant: tenant, user: user}
   end

@@ -4,8 +4,8 @@ defmodule Arbiter.Infra.PostgresOutboxTest do
   alias Arbiter.Repo
   alias Arbiter.Sync.OutboxEvent
   alias Arbiter.Sync.RevokeSimulation
-  alias Arbiter.Tenants.Tenant
-  alias Arbiter.Tenants.User
+
+  import Arbiter.DomainFixtures
 
   setup_all do
     Ecto.Adapters.SQL.Sandbox.mode(Repo, :auto)
@@ -15,19 +15,13 @@ defmodule Arbiter.Infra.PostgresOutboxTest do
   end
 
   test "revoke simulation persists outbox rows against a Testcontainers PostgreSQL database" do
-    tenant =
-      %Tenant{}
-      |> Tenant.changeset(%{name: "infra-tenant-#{System.unique_integer([:positive])}"})
-      |> Repo.insert!()
+    tenant = tenant_fixture("infra-tenant")
 
     user =
-      %User{tenant_id: tenant.id}
-      |> User.changeset(%{
+      user_fixture(tenant,
         email: "infra-user-#{System.unique_integer([:positive])}@example.com",
-        role: "analyst",
         policy_version: "policy_v12"
-      })
-      |> Repo.insert!()
+      )
 
     assert {:ok, result} =
              RevokeSimulation.revoke_user_access(user,
