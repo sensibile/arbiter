@@ -106,7 +106,7 @@
 
 ### Sync/Revoke와 Outbox Consumer Boundary
 
-소유 모듈: `Arbiter.Sync.RevokeSimulation`, `Arbiter.Sync.Outbox`, `Arbiter.Sync.OutboxEvent`, `Arbiter.Sync.OutboxConsumerCommand`, `Arbiter.Sync.OutboxReadModelDispatch`, `Arbiter.Sync.OutboxConsumer`
+소유 모듈: `Arbiter.Sync.RevokeSimulation`, `Arbiter.Sync.Outbox`, `Arbiter.Sync.OutboxEvent`, `Arbiter.Sync.OutboxConsumerCommand`, `Arbiter.Sync.OutboxReadModelDispatch`, `Arbiter.Sync.OutboxConsumer`, `Arbiter.Sync.OutboxProcessor`
 
 책임:
 
@@ -118,6 +118,7 @@
 - Revoke audit event shape를 반환합니다.
 - `Arbiter.Sync.OutboxConsumerCommand`를 통해 outbox row 상태 전이를 순수 데이터로 결정합니다.
 - `Arbiter.Sync.OutboxConsumer`를 통해 사용 가능한 `pending` outbox row를 claim하고 `processing`, `processed`, `failed` 상태 변경을 저장합니다.
+- `Arbiter.Sync.OutboxProcessor.run_once/2`를 통해 bounded outbox processing pass를 한 번 실행합니다.
 - Persisted `id`, `attempts`, `locked_at`이 claim한 row와 여전히 일치할 때만 claimed row를 terminal 상태로 표시합니다.
 - `invalidate_user_access_cache` event를 `Arbiter.ReadModels.invalidate_user_access/4`로 dispatch해서 revoke 후 오래된 `accessible_document_chunks` row를 invalidation합니다.
 
@@ -136,7 +137,7 @@ Arbiter는 Event Sourcing 대신 current-state CQRS를 사용합니다.
 - Audit record는 lineage이며 replay 가능한 command state가 아닙니다.
 - Outbox row는 propagation command이며 source of truth가 아닙니다.
 - Revoke path는 비동기 projection refresh를 기다리지 않기 위해 policy version 증가와 stale-snapshot fail-close 동작을 사용합니다.
-- Outbox 처리는 `pending -> processing -> processed | failed`를 사용합니다. 현재 구현은 supervised background worker가 아니라 claim/mark skeleton입니다.
+- Outbox 처리는 `pending -> processing -> processed | failed`를 사용합니다. 현재 구현은 supervised background worker가 아니라 bounded `run_once/2` processor입니다.
 - `accessible_document_chunks`는 retrieval filtering을 위한 첫 구현 read model table입니다. Active lookup은 tenant, user, user policy version, chunk deletion state, revoke invalidation state로 scope됩니다.
 
 ## Fail-Closed 불변식

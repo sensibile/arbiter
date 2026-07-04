@@ -156,5 +156,6 @@ MVP에는 현재 다음 구현이 포함되어 있습니다.
 - User/chunk/decision을 projection attrs로 순수 변환하는 `Arbiter.ReadModels.AccessibleDocumentChunkBuilder`
 - Projection upsert, active lookup, user-policy invalidation을 담당하는 `Arbiter.ReadModels`
 - User-access invalidation outbox event를 read model command로 매핑하는 `Arbiter.Sync.OutboxReadModelDispatch`
+- Pending outbox row를 claim하고 지원되는 read model command를 dispatch한 뒤 row를 processed 또는 failed로 표시하는 bounded pass인 `Arbiter.Sync.OutboxProcessor.run_once/2`
 - User/resource policy version에 대한 Gateway stale snapshot check
 - Hot-path core에 직접 Repo/read-model dependency를 만들지 않고 accessible chunk id를 retrieval adapter에 전달하는 Gateway read model scope injection

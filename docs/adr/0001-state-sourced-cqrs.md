@@ -156,5 +156,6 @@ The MVP currently includes:
 - `Arbiter.ReadModels.AccessibleDocumentChunkBuilder` for pure user/chunk/decision-to-projection attribute shaping.
 - `Arbiter.ReadModels` for projection upsert, active lookup, and user-policy invalidation.
 - `Arbiter.Sync.OutboxReadModelDispatch` for mapping user-access invalidation outbox events to read model commands.
+- `Arbiter.Sync.OutboxProcessor.run_once/2` for one bounded pass that claims pending outbox rows, dispatches supported read model commands, and marks rows processed or failed.
 - Gateway stale snapshot checks for user and resource policy versions.
 - Gateway read model scope injection for passing accessible chunk ids to retrieval adapters without introducing a direct Repo/read-model dependency in the hot-path core.

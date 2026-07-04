@@ -106,7 +106,7 @@ Boundary rule:
 
 ### Sync/Revoke and Outbox Consumer Boundary
 
-Owned by `Arbiter.Sync.RevokeSimulation`, `Arbiter.Sync.Outbox`, `Arbiter.Sync.OutboxEvent`, `Arbiter.Sync.OutboxConsumerCommand`, `Arbiter.Sync.OutboxReadModelDispatch`, and `Arbiter.Sync.OutboxConsumer`.
+Owned by `Arbiter.Sync.RevokeSimulation`, `Arbiter.Sync.Outbox`, `Arbiter.Sync.OutboxEvent`, `Arbiter.Sync.OutboxConsumerCommand`, `Arbiter.Sync.OutboxReadModelDispatch`, `Arbiter.Sync.OutboxConsumer`, and `Arbiter.Sync.OutboxProcessor`.
 
 Responsibilities:
 
@@ -118,6 +118,7 @@ Responsibilities:
 - Return a revoke audit event shape.
 - Decide outbox row state transitions as pure data through `Arbiter.Sync.OutboxConsumerCommand`.
 - Claim available `pending` outbox rows and persist `processing`, `processed`, or `failed` status changes through `Arbiter.Sync.OutboxConsumer`.
+- Run one bounded outbox processing pass through `Arbiter.Sync.OutboxProcessor.run_once/2`.
 - Mark claimed rows as terminal only when the persisted `id`, `attempts`, and `locked_at` still match the claimed row.
 - Dispatch `invalidate_user_access_cache` events to `Arbiter.ReadModels.invalidate_user_access/4` so old `accessible_document_chunks` rows are invalidated after revoke.
 
@@ -136,7 +137,7 @@ Arbiter uses current-state CQRS rather than Event Sourcing.
 - Audit records are lineage, not replayable command state.
 - Outbox rows are propagation commands, not the source of truth.
 - Revoke paths use policy version bumps plus stale-snapshot fail-close behavior to avoid waiting for asynchronous projection refreshes.
-- Outbox processing uses `pending -> processing -> processed | failed`; the current implementation provides the claim/mark skeleton, not a supervised background worker.
+- Outbox processing uses `pending -> processing -> processed | failed`; the current implementation provides a bounded `run_once/2` processor, not a supervised background worker.
 - `accessible_document_chunks` is the first implemented read model table for retrieval filtering. Active lookups are scoped by tenant, user, user policy version, chunk deletion state, and revoke invalidation state.
 
 ## Fail-Closed Invariants

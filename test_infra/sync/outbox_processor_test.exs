@@ -1,0 +1,212 @@
+defmodule Arbiter.Sync.OutboxProcessorTest do
+  use Arbiter.DataCase, async: false
+
+  alias Arbiter.Documents.Chunk
+  alias Arbiter.Documents.Document
+  alias Arbiter.ReadModels
+  alias Arbiter.ReadModels.AccessibleDocumentChunk
+  alias Arbiter.Repo
+  alias Arbiter.Sync.OutboxEvent
+  alias Arbiter.Sync.OutboxProcessor
+  alias Arbiter.Tenants.Tenant
+  alias Arbiter.Tenants.User
+
+  @now ~U[2026-06-24 02:00:00Z]
+
+  setup_all do
+    Ecto.Adapters.SQL.Sandbox.mode(Repo, :auto)
+    Ecto.Migrator.run(Repo, :up, all: true)
+    Ecto.Adapters.SQL.Sandbox.mode(Repo, :manual)
+    :ok
+  end
+
+  describe "run_once/2" do
+    test "claims pending read model invalidation events and processes them" do
+      %{tenant: tenant, user: user, document: document, chunk: chunk} =
+        read_model_fixture_scope(policy_version: "policy_v12")
+
+      assert {:ok, projection} =
+               ReadModels.put_accessible_document_chunk(%{
+                 tenant_id: tenant.id,
+                 user_id: user.id,
+                 chunk_id: chunk.id,
+                 document_id: document.id,
+                 user_policy_version: "policy_v12",
+                 chunk_policy_version: chunk.policy_version,
+                 chunk_deleted_at: nil,
+                 access_reason: ["department_match"],
+                 projected_at: @now
+               })
+
+      event =
+        outbox_event_fixture(tenant,
+          aggregate_id: user.id,
+          payload: invalidate_payload(tenant.id, user.id, "policy_v12", "policy_v13")
+        )
+
+      assert {:ok,
+              %{
+                claimed: 1,
+                processed: 1,
+                failed: 0,
+                errors: 0,
+                results: [{:processed, processed_event}]
+              }} = OutboxProcessor.run_once(10, now: @now)
+
+      assert processed_event.id == event.id
+      assert processed_event.status == OutboxEvent.status_processed()
+      assert Repo.get!(AccessibleDocumentChunk, projection.id).invalidated_at == @now
+
+      assert ReadModels.accessible_chunk_ids(%{
+               tenant_id: tenant.id,
+               user_id: user.id,
+               user_policy_version: "policy_v12"
+             }) == []
+    end
+
+    test "honors the claim limit and leaves later rows pending" do
+      tenant = tenant_fixture()
+      user_id = Ecto.UUID.generate()
+
+      first =
+        outbox_event_fixture(tenant,
+          aggregate_id: user_id,
+          payload: invalidate_payload(tenant.id, user_id, "policy_v1", "policy_v2"),
+          available_at: ~U[2026-06-24 01:00:00Z]
+        )
+
+      second =
+        outbox_event_fixture(tenant,
+          aggregate_id: user_id,
+          payload: invalidate_payload(tenant.id, user_id, "policy_v2", "policy_v3"),
+          available_at: ~U[2026-06-24 01:01:00Z]
+        )
+
+      assert {:ok, %{claimed: 1, processed: 1, failed: 0, errors: 0}} =
+               OutboxProcessor.run_once(1, now: @now)
+
+      assert Repo.get!(OutboxEvent, first.id).status == OutboxEvent.status_processed()
+      assert Repo.get!(OutboxEvent, second.id).status == OutboxEvent.status_pending()
+    end
+
+    test "marks unsupported read model events failed without aborting the pass" do
+      tenant = tenant_fixture()
+      user_id = Ecto.UUID.generate()
+
+      unsupported =
+        outbox_event_fixture(tenant,
+          event_type: "invalidate_tool_result_cache",
+          aggregate_id: user_id,
+          payload: %{"cache_key" => "tool-result"}
+        )
+
+      supported =
+        outbox_event_fixture(tenant,
+          aggregate_id: user_id,
+          payload: invalidate_payload(tenant.id, user_id, "policy_v3", "policy_v4")
+        )
+
+      assert {:ok,
+              %{
+                claimed: 2,
+                processed: 1,
+                failed: 1,
+                errors: 0,
+                results: results
+              }} = OutboxProcessor.run_once(10, now: @now)
+
+      assert {:failed, failed_event} =
+               Enum.find(results, fn
+                 {:failed, event} -> event.id == unsupported.id
+                 _result -> false
+               end)
+
+      assert failed_event.status == OutboxEvent.status_failed()
+      assert failed_event.last_error == "unsupported_read_model_command"
+      assert Repo.get!(OutboxEvent, supported.id).status == OutboxEvent.status_processed()
+    end
+
+    test "rejects invalid limits before claiming rows" do
+      assert OutboxProcessor.run_once(0, now: @now) == {:error, :invalid_limit}
+      assert OutboxProcessor.run_once("1", now: @now) == {:error, :invalid_limit}
+    end
+  end
+
+  defp invalidate_payload(tenant_id, user_id, previous_policy_version, current_policy_version) do
+    %{
+      "command" => "invalidate_user_access_cache",
+      "tenant_id" => tenant_id,
+      "user_id" => user_id,
+      "previous_policy_version" => previous_policy_version,
+      "current_policy_version" => current_policy_version
+    }
+  end
+
+  defp tenant_fixture do
+    %Tenant{}
+    |> Tenant.changeset(%{"name" => "outbox-processor-tenant-#{System.unique_integer([:positive])}"})
+    |> Repo.insert!()
+  end
+
+  defp outbox_event_fixture(tenant, attrs) do
+    attrs =
+      Keyword.merge(
+        [
+          tenant_id: tenant.id,
+          event_type: "invalidate_user_access_cache",
+          aggregate_type: "user",
+          aggregate_id: Ecto.UUID.generate(),
+          payload: %{"cache_key" => "user_access"},
+          status: OutboxEvent.status_pending(),
+          attempts: 0,
+          available_at: @now
+        ],
+        attrs
+      )
+
+    %OutboxEvent{}
+    |> OutboxEvent.changeset(Map.new(attrs))
+    |> Repo.insert!()
+  end
+
+  defp read_model_fixture_scope(attrs) do
+    tenant = tenant_fixture()
+
+    user =
+      %User{tenant_id: tenant.id}
+      |> User.changeset(%{
+        email: "outbox-processor-user-#{System.unique_integer([:positive])}@example.com",
+        role: "analyst",
+        department_ids: ["finance"],
+        clearance_level: 2,
+        policy_version: Keyword.fetch!(attrs, :policy_version)
+      })
+      |> Repo.insert!()
+
+    document =
+      %Document{tenant_id: tenant.id}
+      |> Document.changeset(%{
+        source: "gdrive",
+        department_id: "finance",
+        classification: "internal",
+        sensitivity_level: 1,
+        status: "active",
+        acl_version: "acl_v1"
+      })
+      |> Repo.insert!()
+
+    chunk =
+      %Chunk{tenant_id: tenant.id, document_id: document.id}
+      |> Chunk.changeset(%{
+        text: "renewal risk",
+        department_id: "finance",
+        sensitivity_level: 1,
+        visibility: "department",
+        acl_version: "acl_v1",
+        policy_version: Keyword.fetch!(attrs, :policy_version)
+      })
+      |> Repo.insert!()
+
+    %{tenant: tenant, user: user, document: document, chunk: chunk}
+  end
+end
