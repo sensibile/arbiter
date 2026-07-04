@@ -29,6 +29,12 @@ See `docs/adr/0001-state-sourced-cqrs.md` for the storage strategy.
 
 ## Local Setup
 
+Install the pinned local toolchain:
+
+```sh
+mise install
+```
+
 Run the local PostgreSQL dependency:
 
 ```sh

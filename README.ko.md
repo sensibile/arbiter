@@ -29,6 +29,12 @@ Arbiter는 AI agent가 현재 사용자가 접근할 수 있는 데이터만 검
 
 ## 로컬 설정
 
+고정된 로컬 toolchain을 설치합니다.
+
+```sh
+mise install
+```
+
 로컬 PostgreSQL 의존성을 실행합니다.
 
 ```sh
