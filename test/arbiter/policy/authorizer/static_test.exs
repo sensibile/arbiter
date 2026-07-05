@@ -74,6 +74,28 @@ defmodule Arbiter.Policy.Authorizer.StaticTest do
              ) == {:error, :invalid_user_clearance_level}
     end
 
+    test "fails closed for malformed policy data" do
+      assert Authorizer.authorize(
+               {Static, Map.put(policy(), :role_assignments, "invalid")},
+               request()
+             ) == {:error, :invalid_role_assignment}
+
+      assert Authorizer.authorize(
+               {Static, put_in(policy(), [:role_assignments, "user_123"], [""])},
+               request()
+             ) == {:error, :invalid_role_assignment}
+
+      assert Authorizer.authorize(
+               {Static, Map.put(policy(), :permissions, "invalid")},
+               request()
+             ) == {:error, :invalid_permissions}
+
+      assert Authorizer.authorize(
+               {Static, Map.put(policy(), :permissions, [%{role: "analyst"}])},
+               request()
+             ) == {:error, :invalid_permission}
+    end
+
     test "rejects invalid authorizer inputs" do
       assert Authorizer.authorize(:not_an_authorizer, request()) == {:error, :invalid_authorizer}
 

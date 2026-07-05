@@ -70,12 +70,13 @@ defmodule Arbiter.Policy.Authorizer.Static do
     role_assignments =
       Map.get(policy, :role_assignments, Map.get(policy, "role_assignments", %{}))
 
-    roles = Map.get(role_assignments, user_id, [])
-
-    if is_list(roles) and Enum.all?(roles, &valid_string?/1) do
+    with true <- is_map(role_assignments),
+         roles <- Map.get(role_assignments, user_id, []),
+         true <- is_list(roles),
+         true <- Enum.all?(roles, &valid_string?/1) do
       {:ok, roles}
     else
-      {:error, :invalid_role_assignment}
+      _invalid_role_assignment -> {:error, :invalid_role_assignment}
     end
   end
 
@@ -89,6 +90,9 @@ defmodule Arbiter.Policy.Authorizer.Static do
       not is_list(permissions) ->
         {:error, :invalid_permissions}
 
+      not Enum.all?(permissions, &valid_permission?/1) ->
+        {:error, :invalid_permission}
+
       Enum.any?(permissions, &permission_matches?(&1, roles, request_scope)) ->
         :ok
 
@@ -96,6 +100,15 @@ defmodule Arbiter.Policy.Authorizer.Static do
         {:deny, ["rbac_denied"], policy_version}
     end
   end
+
+  defp valid_permission?(permission) when is_map(permission) do
+    valid_string?(fetch(permission, "role")) and
+      valid_string?(fetch(permission, "action")) and
+      valid_string?(fetch(permission, "resource_type")) and
+      valid_optional_string?(fetch(permission, "tenant_id"))
+  end
+
+  defp valid_permission?(_permission), do: false
 
   defp permission_matches?(permission, roles, request_scope) when is_map(permission) do
     role = fetch(permission, "role")
@@ -202,4 +215,6 @@ defmodule Arbiter.Policy.Authorizer.Static do
   defp atom_key(_key), do: nil
 
   defp valid_string?(value), do: is_binary(value) and value != ""
+  defp valid_optional_string?(nil), do: true
+  defp valid_optional_string?(value), do: valid_string?(value)
 end
