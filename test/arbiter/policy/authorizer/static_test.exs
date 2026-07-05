@@ -31,6 +31,33 @@ defmodule Arbiter.Policy.Authorizer.StaticTest do
       assert decision.scope == %{}
     end
 
+    test "allows tenantless permissions and string-key policy maps" do
+      policy =
+        policy()
+        |> put_in([:permissions, Access.at(0), :tenant_id], nil)
+        |> string_key_policy()
+
+      assert {:ok, decision} = Authorizer.authorize({Static, policy}, request())
+      assert decision.decision == :allow
+    end
+
+    test "fails closed for malformed request identity fields" do
+      assert Authorizer.authorize({Static, policy()}, request(tenant_id: "")) ==
+               {:error, :invalid_tenant_id}
+
+      assert Authorizer.authorize({Static, policy()}, request(user_id: "")) ==
+               {:error, :invalid_user_id}
+
+      assert Authorizer.authorize({Static, policy()}, request(action: "")) ==
+               {:error, :invalid_action}
+
+      assert Authorizer.authorize({Static, policy()}, request(resource_type: "")) ==
+               {:error, :invalid_resource_type}
+
+      assert Authorizer.authorize({Static, policy()}, request(user_snapshot: "invalid")) ==
+               {:error, :invalid_user_snapshot}
+    end
+
     test "fails closed for tenant mismatch and malformed ABAC attributes" do
       assert Authorizer.authorize(
                {Static, policy()},
@@ -72,9 +99,60 @@ defmodule Arbiter.Policy.Authorizer.StaticTest do
                  }
                )
              ) == {:error, :invalid_user_clearance_level}
+
+      assert Authorizer.authorize(
+               {Static, policy()},
+               request(
+                 user_snapshot: %{
+                   "id" => "user_123",
+                   "tenant_id" => 123,
+                   "department_ids" => ["finance"],
+                   "clearance_level" => 3
+                 }
+               )
+             ) == {:error, :invalid_user_tenant_id}
+
+      assert Authorizer.authorize(
+               {Static, policy()},
+               request(
+                 user_snapshot: %{
+                   "id" => "user_123",
+                   "tenant_id" => "tenant_a",
+                   "clearance_level" => 3
+                 }
+               )
+             ) == {:error, :missing_user_department_ids}
+
+      assert Authorizer.authorize(
+               {Static, policy()},
+               request(
+                 user_snapshot: %{
+                   "id" => "user_123",
+                   "tenant_id" => "tenant_a",
+                   "department_ids" => [""],
+                   "clearance_level" => 3
+                 }
+               )
+             ) == {:error, :invalid_user_department_ids}
+
+      assert Authorizer.authorize(
+               {Static, policy()},
+               request(
+                 user_snapshot: %{
+                   "id" => "user_123",
+                   "tenant_id" => "tenant_a",
+                   "department_ids" => ["finance"]
+                 }
+               )
+             ) == {:error, :missing_user_clearance_level}
     end
 
     test "fails closed for malformed policy data" do
+      assert Authorizer.authorize(
+               {Static, Map.put(policy(), :policy_version, "")},
+               request()
+             ) == {:error, :invalid_policy_version}
+
       assert Authorizer.authorize(
                {Static, Map.put(policy(), :role_assignments, "invalid")},
                request()
@@ -92,6 +170,11 @@ defmodule Arbiter.Policy.Authorizer.StaticTest do
 
       assert Authorizer.authorize(
                {Static, Map.put(policy(), :permissions, [%{role: "analyst"}])},
+               request()
+             ) == {:error, :invalid_permission}
+
+      assert Authorizer.authorize(
+               {Static, Map.put(policy(), :permissions, [:invalid])},
                request()
              ) == {:error, :invalid_permission}
     end
@@ -135,6 +218,17 @@ defmodule Arbiter.Policy.Authorizer.StaticTest do
           tenant_id: "tenant_a"
         }
       ]
+    }
+  end
+
+  defp string_key_policy(policy) do
+    %{
+      "policy_version" => policy.policy_version,
+      "role_assignments" => policy.role_assignments,
+      "permissions" =>
+        Enum.map(policy.permissions, fn permission ->
+          Map.new(permission, fn {key, value} -> {Atom.to_string(key), value} end)
+        end)
     }
   end
 
