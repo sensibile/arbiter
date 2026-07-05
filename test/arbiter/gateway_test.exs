@@ -535,6 +535,17 @@ defmodule Arbiter.GatewayTest do
                  authorize: fn _tool_call -> {:error, :policy_store_unavailable} end
                )
 
+      assert_failed_closed(error, :policy_store_unavailable)
+      assert error.audit_event.reason == ["policy_store_unavailable"]
+    end
+
+    test "fails closed with a generic reason when authorization fails with an unsafe reason shape" do
+      assert {:error, error} =
+               Gateway.run_tool_call(tool_call(),
+                 tools: tools(fn _guarded_query -> {:ok, []} end),
+                 authorize: fn _tool_call -> {:error, %{adapter: :casbin}} end
+               )
+
       assert_failed_closed(error, :authorization_failed)
     end
 

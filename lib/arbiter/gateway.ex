@@ -93,8 +93,8 @@ defmodule Arbiter.Gateway do
       {:ok, %Decision{decision: :deny} = decision} ->
         {:deny, decision}
 
-      {:error, _reason} ->
-        {:error, fail_closed(tool_call, nil, :authorization_failed)}
+      {:error, reason} ->
+        {:error, fail_closed(tool_call, nil, authorization_error_reason(reason))}
 
       _other ->
         {:error, fail_closed(tool_call, nil, :authorization_failed)}
@@ -104,6 +104,9 @@ defmodule Arbiter.Gateway do
   defp authorize_call(tool_call, _authorize) do
     {:error, fail_closed(tool_call, nil, :authorization_failed)}
   end
+
+  defp authorization_error_reason(reason) when is_atom(reason), do: reason
+  defp authorization_error_reason(_reason), do: :authorization_failed
 
   defp validate_tenant_scope(%ToolCall{} = tool_call, %Decision{} = decision) do
     if decision.scope["tenant_id"] == tool_call.tenant_id do

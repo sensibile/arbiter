@@ -88,6 +88,7 @@ Responsibilities:
 - Resolve the tool contract from an explicit registry.
 - Invoke an injected authorization function.
 - Fail closed on tenant scope mismatch, stale user policy snapshots, stale resource policy snapshots, invalid filters, tool failures, and retrieval validation failures.
+- Preserve safe authorizer error atoms as fail-closed audit reasons; unsafe error shapes are collapsed to `authorization_failed`.
 - Optionally invoke an injected read model scope function to obtain accessible chunk ids for the current tenant, user, and policy version.
 - Pass only Arbiter-guarded queries to retrieval tool adapters.
 - Pass read model chunk allowlists to retrieval adapters through `GuardedQuery.allowed_chunk_ids` and fail closed if returned chunks ignore that allowlist.
