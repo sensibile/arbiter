@@ -121,7 +121,7 @@ Boundary rule:
 
 ### Sync/Revoke and Outbox Consumer Boundary
 
-Owned by `Arbiter.Sync.RevokeSimulation`, `Arbiter.Sync.Outbox`, `Arbiter.Sync.OutboxEvent`, `Arbiter.Sync.OutboxConsumerCommand`, `Arbiter.Sync.OutboxReadModelDispatch`, `Arbiter.Sync.OutboxConsumer`, `Arbiter.Sync.OutboxProcessor`, and `Arbiter.Sync.OutboxWorker`.
+Owned by `Arbiter.Sync.RevokeSimulation`, `Arbiter.Sync.Outbox`, `Arbiter.Sync.OutboxEvent`, `Arbiter.Sync.OutboxConsumerCommand`, `Arbiter.Sync.OutboxPayload`, `Arbiter.Sync.OutboxReadModelDispatch`, `Arbiter.Sync.OutboxCacheDispatch`, `Arbiter.Sync.OutboxConsumer`, `Arbiter.Sync.OutboxProcessor`, and `Arbiter.Sync.OutboxWorker`.
 
 Responsibilities:
 
@@ -146,6 +146,7 @@ Boundary rule:
 
 - This boundary persists propagation commands as outbox rows and owns outbox status persistence. Real cache/process, vector, and search adapters should remain outside the policy and retrieval core.
 - `Arbiter.Sync.OutboxConsumerCommand` must not call Repo, clocks, processes, cache adapters, or vector/search adapters. Callers pass timestamps in as data.
+- `Arbiter.Sync.OutboxPayload` centralizes pure outbox payload validation and identity checks used by dispatch modules.
 - `Arbiter.Sync.OutboxReadModelDispatch` must stay pure. It validates event payloads and returns read model commands, but does not call `Arbiter.Repo` or `Arbiter.ReadModels`.
 - `Arbiter.Sync.OutboxCacheDispatch` must stay pure. It validates event payloads and returns cache adapter commands, but does not call adapters.
 - `Arbiter.Sync.OutboxWorker` must not know read model or cache command details. It schedules `Arbiter.Sync.OutboxProcessor.run_once/2` with configured limits, intervals, and optional worker ownership.

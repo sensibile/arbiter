@@ -51,13 +51,17 @@ defmodule Arbiter.Sync.OutboxConsumer do
     update_claimed_from_command(event, OutboxConsumerCommand.mark_failed(event, error, now))
   end
 
-  def process_read_model_event(%OutboxEvent{} = event, opts \\ []) do
+  def process_event(%OutboxEvent{} = event, opts \\ []) do
     now = Keyword.get_lazy(opts, :now, &default_now/0)
 
     event
     |> dispatch_command(now)
     |> execute_command(opts)
     |> mark_processed_or_failed(event, now)
+  end
+
+  def process_read_model_event(%OutboxEvent{} = event, opts \\ []) do
+    process_event(event, opts)
   end
 
   defp claim_event!(event, now, claim_opts) do

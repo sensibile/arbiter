@@ -121,7 +121,7 @@
 
 ### Sync/Revoke와 Outbox Consumer Boundary
 
-소유 모듈: `Arbiter.Sync.RevokeSimulation`, `Arbiter.Sync.Outbox`, `Arbiter.Sync.OutboxEvent`, `Arbiter.Sync.OutboxConsumerCommand`, `Arbiter.Sync.OutboxReadModelDispatch`, `Arbiter.Sync.OutboxConsumer`, `Arbiter.Sync.OutboxProcessor`, `Arbiter.Sync.OutboxWorker`
+소유 모듈: `Arbiter.Sync.RevokeSimulation`, `Arbiter.Sync.Outbox`, `Arbiter.Sync.OutboxEvent`, `Arbiter.Sync.OutboxConsumerCommand`, `Arbiter.Sync.OutboxPayload`, `Arbiter.Sync.OutboxReadModelDispatch`, `Arbiter.Sync.OutboxCacheDispatch`, `Arbiter.Sync.OutboxConsumer`, `Arbiter.Sync.OutboxProcessor`, `Arbiter.Sync.OutboxWorker`
 
 책임:
 
@@ -146,6 +146,7 @@
 
 - 이 boundary는 propagation command를 outbox row로 저장하고 outbox status persistence를 소유합니다. 실제 cache/process, vector, search adapter는 policy와 retrieval core 바깥에 두어야 합니다.
 - `Arbiter.Sync.OutboxConsumerCommand`는 Repo, clock, process, cache adapter, vector/search adapter를 호출하지 않아야 합니다. 호출자가 timestamp를 데이터로 전달합니다.
+- `Arbiter.Sync.OutboxPayload`는 dispatch module이 사용하는 순수 outbox payload validation과 identity check를 중앙화합니다.
 - `Arbiter.Sync.OutboxReadModelDispatch`는 순수 모듈로 유지해야 합니다. Event payload를 검증하고 read model command를 반환하지만 `Arbiter.Repo` 또는 `Arbiter.ReadModels`를 호출하지 않습니다.
 - `Arbiter.Sync.OutboxCacheDispatch`는 순수 모듈로 유지해야 합니다. Event payload를 검증하고 cache adapter command를 반환하지만 adapter를 호출하지 않습니다.
 - `Arbiter.Sync.OutboxWorker`는 read model 또는 cache command 세부사항을 알지 않아야 합니다. 설정된 limit, interval, 선택적 worker ownership으로 `Arbiter.Sync.OutboxProcessor.run_once/2`만 schedule합니다.

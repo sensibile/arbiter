@@ -36,7 +36,7 @@ defmodule Arbiter.Sync.OutboxProcessor do
   end
 
   defp process_event(%OutboxEvent{} = event, opts) do
-    case OutboxConsumer.process_read_model_event(event, opts) do
+    case OutboxConsumer.process_event(event, opts) do
       {:ok, processed_event} -> {:processed, processed_event}
       {:error, %OutboxEvent{} = failed_event} -> {:failed, failed_event}
       {:error, reason} -> {:error, reason, event}

@@ -143,7 +143,7 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
     end
   end
 
-  describe "process_read_model_event/2" do
+  describe "process_event/2" do
     test "invalidates old user access projections and marks claimed event processed" do
       %{tenant: tenant, user: user, document: document, chunk: chunk} =
         read_model_fixture_scope(prefix: "outbox-consumer", policy_version: "policy_v12")
@@ -169,7 +169,7 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
         )
         |> claim!()
 
-      assert {:ok, processed_event} = OutboxConsumer.process_read_model_event(event, now: @now)
+      assert {:ok, processed_event} = OutboxConsumer.process_event(event, now: @now)
       assert processed_event.status == "processed"
 
       assert Repo.get!(AccessibleDocumentChunk, projection.id).invalidated_at == @now
@@ -204,7 +204,7 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
         |> claim!()
 
       assert {:ok, processed_event} =
-               OutboxConsumer.process_read_model_event(event,
+               OutboxConsumer.process_event(event,
                  now: @now,
                  cache_adapter: {Memory, cache}
                )
@@ -226,7 +226,7 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
         )
         |> claim!()
 
-      assert {:error, failed_event} = OutboxConsumer.process_read_model_event(event, now: @now)
+      assert {:error, failed_event} = OutboxConsumer.process_event(event, now: @now)
       assert failed_event.status == "failed"
       assert failed_event.last_error == "cache_adapter_unavailable"
     end
@@ -244,7 +244,7 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
         )
         |> claim!()
 
-      assert {:ok, processed_event} = OutboxConsumer.process_read_model_event(event, now: @now)
+      assert {:ok, processed_event} = OutboxConsumer.process_event(event, now: @now)
       assert processed_event.status == "processed"
 
       assert ReadModels.accessible_chunk_ids(%{
@@ -252,6 +252,23 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
                user_id: user.id,
                user_policy_version: "policy_v13"
              }) == [chunk.id]
+    end
+
+    test "keeps the old read model event wrapper for compatibility" do
+      %{tenant: tenant, user: user} =
+        read_model_fixture_scope(prefix: "outbox-consumer-wrapper", policy_version: "policy_v13")
+
+      event =
+        tenant
+        |> outbox_event_fixture(
+          event_type: "rebuild_user_access_projection",
+          aggregate_id: user.id,
+          payload: rebuild_user_access_payload(tenant.id, user.id, "policy_v13")
+        )
+        |> claim!()
+
+      assert {:ok, processed_event} = OutboxConsumer.process_read_model_event(event, now: @now)
+      assert processed_event.status == "processed"
     end
   end
 
