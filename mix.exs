@@ -9,6 +9,7 @@ defmodule Arbiter.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       test_coverage: test_coverage(),
+      compilers: [:boundary] ++ Mix.compilers(),
       aliases: aliases(),
       deps: deps(),
       listeners: [Phoenix.CodeReloader]
@@ -55,6 +56,7 @@ defmodule Arbiter.MixProject do
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
+      {:boundary, "~> 0.10.4", runtime: false},
       {:testcontainers, "~> 2.3", only: :test}
     ]
   end

@@ -1,4 +1,8 @@
 defmodule Arbiter.ReadModels do
+  use Boundary,
+    deps: [Arbiter.Documents, Arbiter.Policy, Arbiter.Repo, Arbiter.Tenants],
+    exports: [AccessibleDocumentChunk, AccessibleDocumentChunkBuilder]
+
   @moduledoc """
   Repo boundary for runtime read model projections.
 

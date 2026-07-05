@@ -1,4 +1,8 @@
 defmodule Arbiter.Application do
+  use Boundary,
+    top_level?: true,
+    deps: [Arbiter, ArbiterWeb]
+
   # See https://elixir.hexdocs.pm/Application.html
   # for more information on OTP Applications
   @moduledoc false

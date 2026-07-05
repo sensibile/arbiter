@@ -1,4 +1,8 @@
 defmodule ArbiterWeb.ConnCase do
+  use Boundary,
+    top_level?: true,
+    deps: [Arbiter.DataCase, ArbiterWeb]
+
   @moduledoc """
   This module defines the test case to be used by
   tests that require setting up a connection.

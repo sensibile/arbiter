@@ -1,4 +1,11 @@
 defmodule Arbiter.SyncFixtures do
+  use Boundary,
+    deps: [
+      Arbiter.DomainFixtures,
+      Arbiter.Repo,
+      Arbiter.Sync
+    ]
+
   @moduledoc false
 
   alias Arbiter.DomainFixtures

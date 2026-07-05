@@ -2,52 +2,51 @@
 
 [한국어](architecture-boundaries.ko.md)
 
-This note records the current boundary-tool review before adding a compile-time boundary dependency.
+This note records the current compile-time boundary configuration.
 
-## Current Xref Result
+## Current Boundary Spec
 
-Commands run on 2026-07-05:
+Command:
 
 ```sh
-mix xref graph --format cycles --label compile-connected
-mix xref graph --format stats --label compile-connected
-mix xref graph --format plain --label compile-connected
+mix boundary.spec
 ```
 
-Result:
+Declared groups:
 
-- No compile-time cycles.
-- `compile-connected` reported 51 tracked files and 2 compile dependency edges.
-- The plain compile-connected graph emitted no dependency lines.
+| Boundary | Exports | Dependencies |
+| --- | --- | --- |
+| `Arbiter` | domain boundary modules | none |
+| `Arbiter.Agents` | `AgentRun` | `Arbiter.Tenants` |
+| `Arbiter.Application` | none | `Arbiter`, `ArbiterWeb` |
+| `Arbiter.Audit` | `AnswerLineage` | `Arbiter.Policy`, `Arbiter.Repo`, `Arbiter.Retrieval` |
+| `Arbiter.Documents` | `Chunk`, `Document` | `Arbiter.Tenants` |
+| `Arbiter.Gateway` | `Error`, `Result`, `ToolCall` | `Arbiter.Policy`, `Arbiter.Retrieval` |
+| `Arbiter.Policy` | policy core structs and modules | none |
+| `Arbiter.ReadModels` | `AccessibleDocumentChunk`, `AccessibleDocumentChunkBuilder` | `Arbiter.Documents`, `Arbiter.Policy`, `Arbiter.Repo`, `Arbiter.Tenants` |
+| `Arbiter.Repo` | none | none |
+| `Arbiter.Retrieval` | retrieval guard structs and modules | `Arbiter.Policy` |
+| `Arbiter.Sync` | outbox, revoke, processor, worker modules | `Arbiter.Policy`, `Arbiter.ReadModels`, `Arbiter.Repo`, `Arbiter.Tenants` |
+| `Arbiter.Tenants` | tenant schemas | none |
+| `ArbiterWeb` | Phoenix web modules | none |
 
-## Decision
+## Enforced Rules
 
-Do not add `:boundary` yet.
+- Deep `Arbiter.Policy` and `Arbiter.Retrieval` modules cannot call `Arbiter.Repo`.
+- `Arbiter.Gateway` can depend on policy and retrieval contracts, but not Repo, read models, sync, audit, web, cache, vector, or HTTP adapters.
+- `Arbiter.ReadModels` owns projection storage and may use Repo, command schemas, and policy decision structs.
+- `Arbiter.Sync` owns outbox/revoke orchestration and may call read model and Repo boundaries.
+- `Arbiter.Application` is the composition root for the domain app and Phoenix web boundary.
 
-The current compile graph is still small enough that a new dependency would mostly encode rules that are already documented and manually reviewable. The supervised outbox worker still depends only on the sync boundary, so the next good trigger for adding `:boundary` is one of:
+## Review Commands
 
-- a real vector/search adapter,
-- cache adapter integration,
-- SaaS connector or HTTP client integration,
-- more than one read model boundary module used by gateway/retrieval orchestration.
+Boundary checks run during compilation:
 
-## Proposed Boundary Rules
+```sh
+mix compile --warnings-as-errors
+```
 
-When `:boundary` is added, start with these groups:
-
-| Boundary | Modules | May depend on | Must not depend on |
-| --- | --- | --- | --- |
-| Policy Core | `Arbiter.Policy.*` | Elixir stdlib, policy structs | `Arbiter.Repo`, Ecto query execution, Sync, Audit, ReadModels, Web, external adapters |
-| Retrieval Core | `Arbiter.Retrieval.*` | Policy decision structs, scope compiler output | `Arbiter.Repo`, ReadModels, Sync, Audit, Web, vector adapters |
-| Gateway Orchestration | `Arbiter.Gateway*` | Policy/Retrieval structs and injected functions | `Arbiter.Repo`, direct HTTP/vector/cache adapters, Web |
-| Read Model Boundary | `Arbiter.ReadModels*` | Repo, schema modules, Ecto queries | Policy parser/evaluator internals, Gateway, Web |
-| Sync Boundary | `Arbiter.Sync*` | Repo, outbox schemas, pure command modules | Gateway, Web, Retrieval guard internals |
-| Audit Boundary | `Arbiter.Audit*` | Repo, audit schemas | Gateway execution, Retrieval guard internals, Web |
-| Web Boundary | `ArbiterWeb*` | Public application boundaries | Deep policy/retrieval internals where avoidable |
-
-## Interim Check
-
-Until `:boundary` is installed, use these checks when adding a new cross-boundary call:
+Use xref when debugging dependency shape:
 
 ```sh
 mix xref graph --format cycles --label compile-connected
@@ -55,4 +54,4 @@ mix xref graph --format stats --label compile-connected
 mix xref trace lib/path/to/file.ex --label compile
 ```
 
-If a pure core module starts importing `Arbiter.Repo`, `Ecto.Query`, HTTP clients, process workers, cache adapters, or vector adapters, treat that as a boundary violation and move the dependency behind an orchestration or persistence boundary.
+Before adding cache, vector/search, SaaS, or HTTP adapters, define whether they belong under `Arbiter.Sync`, a new adapter boundary, or a narrower boundary documented here.

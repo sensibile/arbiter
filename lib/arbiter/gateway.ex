@@ -1,4 +1,8 @@
 defmodule Arbiter.Gateway do
+  use Boundary,
+    deps: [Arbiter.Policy, Arbiter.Retrieval],
+    exports: [Error, Result, ToolCall]
+
   @moduledoc """
   Policy-aware gateway for agent tool calls.
 

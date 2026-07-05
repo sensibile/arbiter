@@ -108,7 +108,14 @@ telemetry with duration, status, limit, and aggregate row counts only.
 
 ## Architecture Checks
 
-Useful built-in dependency checks:
+Boundary enforcement runs during compilation through the `:boundary` compiler.
+Use this when reviewing the declared boundary groups:
+
+```sh
+mix boundary.spec
+```
+
+Useful built-in dependency checks still help when investigating compile-time dependency shape:
 
 ```sh
 mix xref graph --format cycles --label compile-connected
@@ -117,4 +124,4 @@ mix xref graph --format stats --label compile-connected
 
 Use `mix xref trace path/to/file.ex --label compile` to investigate a specific compile-time dependency.
 
-For stronger architecture boundary enforcement, the likely next tool to evaluate is the `:boundary` library. For now, Arbiter keeps boundaries explicit through module contracts, focused tests, and xref checks.
+For adapter work, keep new cache, vector/search, and SaaS clients behind boundary modules. `mix compile --warnings-as-errors` fails when a forbidden boundary reference is introduced.

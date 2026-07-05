@@ -1,4 +1,8 @@
 defmodule Arbiter.DataCase do
+  use Boundary,
+    top_level?: true,
+    deps: [Arbiter]
+
   @moduledoc """
   This module defines the setup for tests requiring
   access to the application's data layer.

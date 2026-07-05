@@ -105,7 +105,13 @@ config :arbiter, Arbiter.Sync.OutboxWorker,
 
 ## 아키텍처 검사
 
-바로 사용할 수 있는 내장 dependency 검사 명령입니다.
+Boundary enforcement는 `:boundary` compiler를 통해 compilation 중 실행됩니다. 선언된 boundary group을 검토할 때는 다음 명령을 사용합니다.
+
+```sh
+mix boundary.spec
+```
+
+Compile-time dependency 형태를 조사할 때는 내장 dependency 검사도 계속 유용합니다.
 
 ```sh
 mix xref graph --format cycles --label compile-connected
@@ -114,4 +120,4 @@ mix xref graph --format stats --label compile-connected
 
 특정 compile-time dependency를 조사하려면 `mix xref trace path/to/file.ex --label compile`을 사용합니다.
 
-더 강한 아키텍처 경계 enforcement가 필요해지면 다음 후보는 `:boundary` 라이브러리입니다. 현재 Arbiter는 명시적인 모듈 계약, 집중된 테스트, xref 검사로 경계를 유지합니다.
+Adapter 작업에서는 새 cache, vector/search, SaaS client를 boundary module 뒤에 둡니다. 금지된 boundary reference가 추가되면 `mix compile --warnings-as-errors`가 실패합니다.

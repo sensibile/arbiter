@@ -1,4 +1,12 @@
 defmodule Arbiter.DomainFixtures do
+  use Boundary,
+    deps: [
+      Arbiter.Agents,
+      Arbiter.Documents,
+      Arbiter.Repo,
+      Arbiter.Tenants
+    ]
+
   @moduledoc false
 
   alias Arbiter.Agents.AgentRun

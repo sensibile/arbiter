@@ -163,7 +163,13 @@ Arbiter는 Event Sourcing 대신 current-state CQRS를 사용합니다.
 
 ## 아키텍처 경계 검사
 
-새로운 cross-module dependency를 추가하기 전에 내장 xref 검사를 사용합니다.
+Arbiter는 `:boundary` compiler로 선언된 module group을 compilation 중 enforcement합니다. 현재 group은 다음 명령으로 확인합니다.
+
+```sh
+mix boundary.spec
+```
+
+새 cross-module dependency를 추가하기 전이나 boundary violation의 dependency shape를 조사할 때는 내장 xref 검사도 사용합니다.
 
 ```sh
 mix xref graph --format cycles --label compile-connected
@@ -176,9 +182,7 @@ mix xref graph --format stats --label compile-connected
 mix xref trace lib/arbiter/gateway.ex --label compile
 ```
 
-더 강한 경계 enforcement가 필요하면 `:boundary` 라이브러리를 검토합니다. 이 라이브러리는 module group, 허용 dependency, export module을 정의하고 compilation 중 forbidden call을 보고할 수 있습니다. 첫 적용 후보는 깊은 `Arbiter.Policy`와 `Arbiter.Retrieval` 모듈이 `Arbiter.Repo`를 호출하지 못하게 막는 규칙입니다.
-
-현재 boundary 검토는 [Architecture Boundary Review](architecture-boundaries.ko.md)에 기록되어 있습니다. 현재 `compile-connected` graph 기준으로 `:boundary` 도입은 다음 external adapter 또는 추가 read model boundary slice까지 보류하되, 적용할 규칙 후보는 명시해 둡니다.
+현재 boundary 설정은 [Architecture Boundary Review](architecture-boundaries.ko.md)에 기록되어 있습니다. 새 cache, vector/search, SaaS, HTTP adapter는 production wiring 전에 기존 boundary group 뒤에 두거나 새 boundary group으로 문서화해야 합니다.
 
 ## Infrastructure Test
 

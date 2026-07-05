@@ -163,7 +163,15 @@ Arbiter currently tests these security invariants:
 
 ## Architecture Boundary Checks
 
-Use built-in xref checks before adding new cross-module dependencies:
+Arbiter uses the `:boundary` compiler to enforce the declared module groups
+during compilation. Review the current groups with:
+
+```sh
+mix boundary.spec
+```
+
+Use built-in xref checks before adding new cross-module dependencies or when a
+boundary violation needs dependency-shape debugging:
 
 ```sh
 mix xref graph --format cycles --label compile-connected
@@ -176,9 +184,7 @@ Trace one file when a dependency looks suspicious:
 mix xref trace lib/arbiter/gateway.ex --label compile
 ```
 
-For stronger boundary enforcement, evaluate the `:boundary` library. It can define module groups, allowed dependencies, and exported modules, then report forbidden calls during compilation. A good first target would be preventing deep `Arbiter.Policy` and `Arbiter.Retrieval` modules from calling `Arbiter.Repo`.
-
-The current boundary review is documented in [Architecture Boundary Review](architecture-boundaries.md). Based on the current `compile-connected` graph, `:boundary` should be deferred until the next external adapter or additional read model boundary slice, but the proposed rules are now explicit.
+The current boundary configuration is documented in [Architecture Boundary Review](architecture-boundaries.md). New cache, vector/search, SaaS, or HTTP adapters should be added behind the existing boundary groups or a newly documented boundary group before production wiring.
 
 ## Infrastructure Tests
 

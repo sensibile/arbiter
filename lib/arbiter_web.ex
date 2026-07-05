@@ -1,4 +1,9 @@
 defmodule ArbiterWeb do
+  use Boundary,
+    top_level?: true,
+    deps: [],
+    exports: [Endpoint, ErrorJSON, Gettext, Router, Telemetry]
+
   @moduledoc """
   The entrypoint for defining your web interface, such
   as controllers, components, channels, and so on.

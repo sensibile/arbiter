@@ -1,4 +1,20 @@
 defmodule Arbiter do
+  use Boundary,
+    top_level?: true,
+    deps: [],
+    exports: [
+      Agents,
+      Audit,
+      Documents,
+      Gateway,
+      Policy,
+      ReadModels,
+      Repo,
+      Retrieval,
+      Sync,
+      Tenants
+    ]
+
   @moduledoc """
   Arbiter keeps the contexts that define your domain
   and business logic.

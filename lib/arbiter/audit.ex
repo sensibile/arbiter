@@ -1,4 +1,8 @@
 defmodule Arbiter.Audit do
+  use Boundary,
+    deps: [Arbiter.Policy, Arbiter.Repo, Arbiter.Retrieval],
+    exports: [AnswerLineage]
+
   @moduledoc """
   Boundary module for audit lineage persistence.
 
