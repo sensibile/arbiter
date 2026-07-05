@@ -135,6 +135,7 @@ defmodule Arbiter.Adapters.Search.Memory do
 
   defp atom_key("id"), do: :id
   defp atom_key("tenant_id"), do: :tenant_id
+  defp atom_key("visibility"), do: :visibility
   defp atom_key("department_id"), do: :department_id
   defp atom_key("sensitivity_level"), do: :sensitivity_level
   defp atom_key("deleted_at"), do: :deleted_at

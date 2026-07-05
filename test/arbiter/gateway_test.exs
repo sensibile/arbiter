@@ -1,6 +1,8 @@
 defmodule Arbiter.GatewayTest do
   use ExUnit.Case, async: true
 
+  alias Arbiter.Adapters.Search
+  alias Arbiter.Adapters.Search.Memory
   alias Arbiter.Gateway
   alias Arbiter.Gateway.ToolCall
   alias Arbiter.Policy.Decision
@@ -142,6 +144,88 @@ defmodule Arbiter.GatewayTest do
       assert guarded_query.allowed_chunk_ids == ["chunk_1"]
       refute Map.has_key?(guarded_query.query, "allowed_chunk_ids")
       assert Enum.map(result.allowed_chunks, & &1.id) == ["chunk_1"]
+    end
+
+    test "runs a guarded search adapter through the injected tool executor" do
+      search =
+        start_supervised!(
+          {Memory,
+           chunks: [
+             chunk("chunk_1",
+               tenant_id: "tenant_a",
+               department_id: "finance",
+               sensitivity_level: 2
+             ),
+             chunk("chunk_2",
+               tenant_id: "tenant_a",
+               department_id: "legal",
+               sensitivity_level: 1
+             ),
+             chunk("chunk_3",
+               tenant_id: "tenant_a",
+               department_id: "sales",
+               sensitivity_level: 1
+             )
+           ]}
+        )
+
+      tool_call =
+        tool_call(
+          query: %{
+            "text" => "renewal risk",
+            "top_k" => 5,
+            "filter" => %{"tenant_id" => "tenant_b"},
+            "allowed_chunk_ids" => ["caller_supplied_chunk"]
+          },
+          user_snapshot: %{
+            "id" => "user_123",
+            "tenant_id" => "tenant_a",
+            "policy_version" => "policy_v12"
+          }
+        )
+
+      assert {:ok, result} =
+               Gateway.run_tool_call(tool_call,
+                 tools: tools(Search.executor({Memory, search})),
+                 authorize: authorize(allow_decision()),
+                 accessible_chunk_ids: fn _scope -> {:ok, ["chunk_2", "chunk_3"]} end
+               )
+
+      assert Enum.map(result.allowed_chunks, & &1.id) == ["chunk_2"]
+      assert result.rejected_chunk_ids == []
+      assert result.audit_event.retrieved_chunk_ids == ["chunk_2"]
+      assert result.audit_event.accepted_chunk_ids == ["chunk_2"]
+      assert result.audit_event.applied_filter["tenant_id"] == "tenant_a"
+      assert result.audit_event.status == "allowed"
+    end
+
+    test "still fails closed if a search executor bypasses the Arbiter allowlist" do
+      execute = fn guarded_query ->
+        assert guarded_query.allowed_chunk_ids == ["chunk_1"]
+
+        {:ok,
+         [
+           chunk("chunk_1",
+             tenant_id: "tenant_a",
+             department_id: "finance",
+             sensitivity_level: 2
+           ),
+           chunk("chunk_2",
+             tenant_id: "tenant_a",
+             department_id: "finance",
+             sensitivity_level: 2
+           )
+         ]}
+      end
+
+      assert {:error, error} =
+               Gateway.run_tool_call(tool_call(),
+                 tools: tools(execute),
+                 authorize: authorize(allow_decision()),
+                 accessible_chunk_ids: fn _scope -> {:ok, ["chunk_1"]} end
+               )
+
+      assert_failed_closed(error, :read_model_scope_mismatch)
     end
 
     test "fails closed when retrieval adapter ignores read model chunk scope" do
@@ -538,6 +622,7 @@ defmodule Arbiter.GatewayTest do
 
   defp chunk(id, attrs) do
     attrs
+    |> Keyword.put_new(:visibility, "department")
     |> Keyword.put_new(:deleted_at, nil)
     |> Keyword.put_new(:policy_version, "policy_v12")
     |> Keyword.put(:id, id)
