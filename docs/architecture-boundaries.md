@@ -6,7 +6,7 @@ This note records the current boundary-tool review before adding a compile-time 
 
 ## Current Xref Result
 
-Commands run on 2026-06-24:
+Commands run on 2026-07-05:
 
 ```sh
 mix xref graph --format cycles --label compile-connected
@@ -17,16 +17,15 @@ mix xref graph --format plain --label compile-connected
 Result:
 
 - No compile-time cycles.
-- `compile-connected` reported 45 tracked files and 2 compile dependency edges.
+- `compile-connected` reported 51 tracked files and 2 compile dependency edges.
 - The plain compile-connected graph emitted no dependency lines.
 
 ## Decision
 
 Do not add `:boundary` yet.
 
-The current compile graph is still small enough that a new dependency would mostly encode rules that are already documented and manually reviewable. The next good trigger for adding `:boundary` is one of:
+The current compile graph is still small enough that a new dependency would mostly encode rules that are already documented and manually reviewable. The supervised outbox worker still depends only on the sync boundary, so the next good trigger for adding `:boundary` is one of:
 
-- a supervised outbox worker,
 - a real vector/search adapter,
 - cache adapter integration,
 - SaaS connector or HTTP client integration,

@@ -23,6 +23,7 @@ The current implementation has completed the first MVP pass:
 - Gateway orchestration for policy-aware tool calls
 - Audit lineage persistence for policy decisions, retrieval traces, and answer lineage
 - Revoke simulation with policy version bumping, transactional outbox invalidation commands, and stale snapshot fail-close
+- Accessible chunk read model projection, rebuild execution, and optional supervised outbox processing
 
 See `docs/architecture.md` for the implemented module boundaries and contract summary.
 See `docs/adr/0001-state-sourced-cqrs.md` for the storage strategy.
@@ -87,6 +88,16 @@ mix phx.server
 
 The default local database URL is `ecto://postgres:postgres@localhost:55432/arbiter_dev`.
 Override it with `DATABASE_URL`; tests can use `TEST_DATABASE_URL`.
+
+The supervised outbox worker is disabled by default. Enable it explicitly when
+you want the app process to run bounded read model propagation passes:
+
+```elixir
+config :arbiter, Arbiter.Sync.OutboxWorker,
+  enabled: true,
+  interval_ms: 5_000,
+  limit: 100
+```
 
 ## Architecture Checks
 

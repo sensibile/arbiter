@@ -141,7 +141,7 @@ Benefits:
 Tradeoffs:
 
 - Projection freshness must be monitored.
-- Projection rebuild workers are still required for production.
+- The optional outbox worker can drive implemented read model operations, but production still needs real cache/vector/search adapters and observability.
 - Duplicate derived state must be validated against versioning rules.
 - Outbox processing needs idempotency and retry semantics.
 
@@ -157,6 +157,7 @@ The MVP currently includes:
 - `Arbiter.ReadModels` for projection upsert, active lookup, and user-policy invalidation.
 - `Arbiter.Sync.OutboxReadModelDispatch` for mapping user-access invalidation and rebuild outbox events to read model commands.
 - `Arbiter.Sync.OutboxProcessor.run_once/2` for one bounded pass that claims pending outbox rows, dispatches supported read model commands, and marks rows processed or failed.
+- `Arbiter.Sync.OutboxWorker` for optional supervised scheduling of bounded outbox processing passes.
 - `rebuild_user_access_projection` execution through `Arbiter.ReadModels.rebuild_user_access_projection/4`, which invalidates old rows and rebuilds active projections from current user and chunk state.
 - Gateway stale snapshot checks for user and resource policy versions.
 - Gateway read model scope injection for passing accessible chunk ids to retrieval adapters without introducing a direct Repo/read-model dependency in the hot-path core.

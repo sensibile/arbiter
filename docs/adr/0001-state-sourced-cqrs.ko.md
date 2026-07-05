@@ -141,7 +141,7 @@ admin revoke command
 Tradeoff:
 
 - Projection freshness를 모니터링해야 합니다.
-- Production에서는 projection rebuild worker가 필요합니다.
+- 선택적 outbox worker가 구현된 read model operation을 구동할 수 있지만, production에는 여전히 실제 cache/vector/search adapter와 observability가 필요합니다.
 - 중복된 derived state를 versioning rule로 검증해야 합니다.
 - Outbox processing에는 idempotency와 retry semantics가 필요합니다.
 
@@ -157,6 +157,7 @@ MVP에는 현재 다음 구현이 포함되어 있습니다.
 - Projection upsert, active lookup, user-policy invalidation을 담당하는 `Arbiter.ReadModels`
 - User-access invalidation 및 rebuild outbox event를 read model command로 매핑하는 `Arbiter.Sync.OutboxReadModelDispatch`
 - Pending outbox row를 claim하고 지원되는 read model command를 dispatch한 뒤 row를 processed 또는 failed로 표시하는 bounded pass인 `Arbiter.Sync.OutboxProcessor.run_once/2`
+- Bounded outbox processing pass를 선택적으로 supervised scheduling하는 `Arbiter.Sync.OutboxWorker`
 - 기존 row를 invalidation한 뒤 현재 user와 chunk 상태에서 active projection을 다시 만드는 `Arbiter.ReadModels.rebuild_user_access_projection/4` 기반 `rebuild_user_access_projection` 실행
 - User/resource policy version에 대한 Gateway stale snapshot check
 - Hot-path core에 직접 Repo/read-model dependency를 만들지 않고 accessible chunk id를 retrieval adapter에 전달하는 Gateway read model scope injection

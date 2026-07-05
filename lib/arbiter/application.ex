@@ -7,16 +7,17 @@ defmodule Arbiter.Application do
 
   @impl true
   def start(_type, _args) do
-    children = [
-      ArbiterWeb.Telemetry,
-      Arbiter.Repo,
-      {DNSCluster, query: Application.get_env(:arbiter, :dns_cluster_query) || :ignore},
-      {Phoenix.PubSub, name: Arbiter.PubSub},
-      # Start a worker by calling: Arbiter.Worker.start_link(arg)
-      # {Arbiter.Worker, arg},
-      # Start to serve requests, typically the last entry
-      ArbiterWeb.Endpoint
-    ]
+    children =
+      [
+        ArbiterWeb.Telemetry,
+        Arbiter.Repo,
+        {DNSCluster, query: Application.get_env(:arbiter, :dns_cluster_query) || :ignore},
+        {Phoenix.PubSub, name: Arbiter.PubSub},
+        outbox_worker_child(),
+        # Start to serve requests, typically the last entry
+        ArbiterWeb.Endpoint
+      ]
+      |> Enum.reject(&is_nil/1)
 
     # See https://elixir.hexdocs.pm/Supervisor.html
     # for other strategies and supported options
@@ -30,5 +31,13 @@ defmodule Arbiter.Application do
   def config_change(changed, _new, removed) do
     ArbiterWeb.Endpoint.config_change(changed, removed)
     :ok
+  end
+
+  defp outbox_worker_child do
+    opts = Application.get_env(:arbiter, Arbiter.Sync.OutboxWorker, [])
+
+    if Keyword.get(opts, :enabled, false) do
+      {Arbiter.Sync.OutboxWorker, Keyword.delete(opts, :enabled)}
+    end
   end
 end

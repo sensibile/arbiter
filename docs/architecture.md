@@ -106,7 +106,7 @@ Boundary rule:
 
 ### Sync/Revoke and Outbox Consumer Boundary
 
-Owned by `Arbiter.Sync.RevokeSimulation`, `Arbiter.Sync.Outbox`, `Arbiter.Sync.OutboxEvent`, `Arbiter.Sync.OutboxConsumerCommand`, `Arbiter.Sync.OutboxReadModelDispatch`, `Arbiter.Sync.OutboxConsumer`, and `Arbiter.Sync.OutboxProcessor`.
+Owned by `Arbiter.Sync.RevokeSimulation`, `Arbiter.Sync.Outbox`, `Arbiter.Sync.OutboxEvent`, `Arbiter.Sync.OutboxConsumerCommand`, `Arbiter.Sync.OutboxReadModelDispatch`, `Arbiter.Sync.OutboxConsumer`, `Arbiter.Sync.OutboxProcessor`, and `Arbiter.Sync.OutboxWorker`.
 
 Responsibilities:
 
@@ -119,6 +119,7 @@ Responsibilities:
 - Decide outbox row state transitions as pure data through `Arbiter.Sync.OutboxConsumerCommand`.
 - Claim available `pending` outbox rows and persist `processing`, `processed`, or `failed` status changes through `Arbiter.Sync.OutboxConsumer`.
 - Run one bounded outbox processing pass through `Arbiter.Sync.OutboxProcessor.run_once/2`.
+- Optionally schedule periodic bounded outbox processing through `Arbiter.Sync.OutboxWorker`; it is disabled by default and owns only process scheduling.
 - Mark claimed rows as terminal only when the persisted `id`, `attempts`, and `locked_at` still match the claimed row.
 - Dispatch `invalidate_user_access_cache` events to `Arbiter.ReadModels.invalidate_user_access/4` so old `accessible_document_chunks` rows are invalidated after revoke.
 - Dispatch `rebuild_user_access_projection` events to `Arbiter.ReadModels.rebuild_user_access_projection/4`, which invalidates old rows for the tenant/user/policy version and rebuilds active projections from current user and chunk state.
@@ -126,9 +127,10 @@ Responsibilities:
 
 Boundary rule:
 
-- This boundary persists propagation commands as outbox rows and owns outbox status persistence. Real cache/process adapters and background workers should remain outside the policy and retrieval core.
+- This boundary persists propagation commands as outbox rows and owns outbox status persistence. Real cache/process, vector, and search adapters should remain outside the policy and retrieval core.
 - `Arbiter.Sync.OutboxConsumerCommand` must not call Repo, clocks, processes, cache adapters, or vector/search adapters. Callers pass timestamps in as data.
 - `Arbiter.Sync.OutboxReadModelDispatch` must stay pure. It validates event payloads and returns read model commands, but does not call `Arbiter.Repo` or `Arbiter.ReadModels`.
+- `Arbiter.Sync.OutboxWorker` must not know read model command details. It schedules `Arbiter.Sync.OutboxProcessor.run_once/2` with configured limits and intervals.
 
 ### Storage Strategy
 
@@ -139,7 +141,7 @@ Arbiter uses current-state CQRS rather than Event Sourcing.
 - Audit records are lineage, not replayable command state.
 - Outbox rows are propagation commands, not the source of truth.
 - Revoke paths use policy version bumps plus stale-snapshot fail-close behavior to avoid waiting for asynchronous projection refreshes.
-- Outbox processing uses `pending -> processing -> processed | failed`; the current implementation provides a bounded `run_once/2` processor for implemented read model operations, not a supervised background worker.
+- Outbox processing uses `pending -> processing -> processed | failed`; the current implementation provides both a bounded `run_once/2` processor and an optional supervised worker for implemented read model operations.
 - `accessible_document_chunks` is the first implemented read model table for retrieval filtering. Active lookups are scoped by tenant, user, user policy version, chunk deletion state, and revoke invalidation state.
 
 ## Fail-Closed Invariants
@@ -174,7 +176,7 @@ mix xref trace lib/arbiter/gateway.ex --label compile
 
 For stronger boundary enforcement, evaluate the `:boundary` library. It can define module groups, allowed dependencies, and exported modules, then report forbidden calls during compilation. A good first target would be preventing deep `Arbiter.Policy` and `Arbiter.Retrieval` modules from calling `Arbiter.Repo`.
 
-The current boundary review is documented in [Architecture Boundary Review](architecture-boundaries.md). Based on the current `compile-connected` graph, `:boundary` should be deferred until the next external adapter or worker slice, but the proposed rules are now explicit.
+The current boundary review is documented in [Architecture Boundary Review](architecture-boundaries.md). Based on the current `compile-connected` graph, `:boundary` should be deferred until the next external adapter or additional read model boundary slice, but the proposed rules are now explicit.
 
 ## Infrastructure Tests
 

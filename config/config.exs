@@ -11,6 +11,11 @@ config :arbiter,
   ecto_repos: [Arbiter.Repo],
   generators: [timestamp_type: :utc_datetime]
 
+config :arbiter, Arbiter.Sync.OutboxWorker,
+  enabled: false,
+  interval_ms: 5_000,
+  limit: 100
+
 # Configure the endpoint
 config :arbiter, ArbiterWeb.Endpoint,
   url: [host: "localhost"],

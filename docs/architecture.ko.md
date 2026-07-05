@@ -106,7 +106,7 @@
 
 ### Sync/Revoke와 Outbox Consumer Boundary
 
-소유 모듈: `Arbiter.Sync.RevokeSimulation`, `Arbiter.Sync.Outbox`, `Arbiter.Sync.OutboxEvent`, `Arbiter.Sync.OutboxConsumerCommand`, `Arbiter.Sync.OutboxReadModelDispatch`, `Arbiter.Sync.OutboxConsumer`, `Arbiter.Sync.OutboxProcessor`
+소유 모듈: `Arbiter.Sync.RevokeSimulation`, `Arbiter.Sync.Outbox`, `Arbiter.Sync.OutboxEvent`, `Arbiter.Sync.OutboxConsumerCommand`, `Arbiter.Sync.OutboxReadModelDispatch`, `Arbiter.Sync.OutboxConsumer`, `Arbiter.Sync.OutboxProcessor`, `Arbiter.Sync.OutboxWorker`
 
 책임:
 
@@ -119,6 +119,7 @@
 - `Arbiter.Sync.OutboxConsumerCommand`를 통해 outbox row 상태 전이를 순수 데이터로 결정합니다.
 - `Arbiter.Sync.OutboxConsumer`를 통해 사용 가능한 `pending` outbox row를 claim하고 `processing`, `processed`, `failed` 상태 변경을 저장합니다.
 - `Arbiter.Sync.OutboxProcessor.run_once/2`를 통해 bounded outbox processing pass를 한 번 실행합니다.
+- `Arbiter.Sync.OutboxWorker`를 통해 periodic bounded outbox processing을 선택적으로 schedule합니다. 이 worker는 기본적으로 비활성화되어 있고 process scheduling만 소유합니다.
 - Persisted `id`, `attempts`, `locked_at`이 claim한 row와 여전히 일치할 때만 claimed row를 terminal 상태로 표시합니다.
 - `invalidate_user_access_cache` event를 `Arbiter.ReadModels.invalidate_user_access/4`로 dispatch해서 revoke 후 오래된 `accessible_document_chunks` row를 invalidation합니다.
 - `rebuild_user_access_projection` event를 `Arbiter.ReadModels.rebuild_user_access_projection/4`로 dispatch합니다. 이 함수는 tenant/user/policy version에 해당하는 기존 row를 invalidation한 뒤 현재 user와 chunk 상태에서 active projection을 다시 만듭니다.
@@ -126,9 +127,10 @@
 
 경계 규칙:
 
-- 이 boundary는 propagation command를 outbox row로 저장하고 outbox status persistence를 소유합니다. 실제 cache/process adapter와 background worker는 policy와 retrieval core 바깥에 두어야 합니다.
+- 이 boundary는 propagation command를 outbox row로 저장하고 outbox status persistence를 소유합니다. 실제 cache/process, vector, search adapter는 policy와 retrieval core 바깥에 두어야 합니다.
 - `Arbiter.Sync.OutboxConsumerCommand`는 Repo, clock, process, cache adapter, vector/search adapter를 호출하지 않아야 합니다. 호출자가 timestamp를 데이터로 전달합니다.
 - `Arbiter.Sync.OutboxReadModelDispatch`는 순수 모듈로 유지해야 합니다. Event payload를 검증하고 read model command를 반환하지만 `Arbiter.Repo` 또는 `Arbiter.ReadModels`를 호출하지 않습니다.
+- `Arbiter.Sync.OutboxWorker`는 read model command 세부사항을 알지 않아야 합니다. 설정된 limit과 interval로 `Arbiter.Sync.OutboxProcessor.run_once/2`만 schedule합니다.
 
 ### 저장소 전략
 
@@ -139,7 +141,7 @@ Arbiter는 Event Sourcing 대신 current-state CQRS를 사용합니다.
 - Audit record는 lineage이며 replay 가능한 command state가 아닙니다.
 - Outbox row는 propagation command이며 source of truth가 아닙니다.
 - Revoke path는 비동기 projection refresh를 기다리지 않기 위해 policy version 증가와 stale-snapshot fail-close 동작을 사용합니다.
-- Outbox 처리는 `pending -> processing -> processed | failed`를 사용합니다. 현재 구현은 구현된 read model operation을 위한 bounded `run_once/2` processor이며, supervised background worker는 아닙니다.
+- Outbox 처리는 `pending -> processing -> processed | failed`를 사용합니다. 현재 구현은 구현된 read model operation을 위한 bounded `run_once/2` processor와 선택적 supervised worker를 제공합니다.
 - `accessible_document_chunks`는 retrieval filtering을 위한 첫 구현 read model table입니다. Active lookup은 tenant, user, user policy version, chunk deletion state, revoke invalidation state로 scope됩니다.
 
 ## Fail-Closed 불변식
@@ -174,7 +176,7 @@ mix xref trace lib/arbiter/gateway.ex --label compile
 
 더 강한 경계 enforcement가 필요하면 `:boundary` 라이브러리를 검토합니다. 이 라이브러리는 module group, 허용 dependency, export module을 정의하고 compilation 중 forbidden call을 보고할 수 있습니다. 첫 적용 후보는 깊은 `Arbiter.Policy`와 `Arbiter.Retrieval` 모듈이 `Arbiter.Repo`를 호출하지 못하게 막는 규칙입니다.
 
-현재 boundary 검토는 [Architecture Boundary Review](architecture-boundaries.ko.md)에 기록되어 있습니다. 현재 `compile-connected` graph 기준으로 `:boundary` 도입은 다음 external adapter 또는 worker slice까지 보류하되, 적용할 규칙 후보는 명시해 둡니다.
+현재 boundary 검토는 [Architecture Boundary Review](architecture-boundaries.ko.md)에 기록되어 있습니다. 현재 `compile-connected` graph 기준으로 `:boundary` 도입은 다음 external adapter 또는 추가 read model boundary slice까지 보류하되, 적용할 규칙 후보는 명시해 둡니다.
 
 ## Infrastructure Test
 
