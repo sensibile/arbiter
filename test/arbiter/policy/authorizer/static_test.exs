@@ -185,6 +185,9 @@ defmodule Arbiter.Policy.Authorizer.StaticTest do
       assert Authorizer.authorize({UnknownAuthorizer, policy()}, request()) ==
                {:error, :invalid_authorizer}
 
+      assert Authorizer.authorize({"not_an_authorizer_module", policy()}, request()) ==
+               {:error, :invalid_authorization_request}
+
       assert Authorizer.authorize({Static, policy()}, :not_a_request) ==
                {:error, :invalid_authorization_request}
 
