@@ -94,6 +94,16 @@ defmodule Arbiter.Authorizers.RepoBackedTest do
                {RepoBacked, %{permissions: permissions(tenant.id)}},
                request(tenant, user, department_ids: ["finance"])
              ) == {:error, :stale_user_departments}
+
+      assert {:ok, user} =
+               user
+               |> User.changeset(%{department_ids: ["finance"], clearance_level: 2})
+               |> Repo.update()
+
+      assert Authorizer.authorize(
+               {RepoBacked, %{permissions: permissions(tenant.id)}},
+               request(tenant, user, clearance_level: 3)
+             ) == {:error, :stale_user_clearance}
     end
 
     test "fails closed for missing users and malformed targets" do
@@ -109,6 +119,44 @@ defmodule Arbiter.Authorizers.RepoBackedTest do
 
       assert Authorizer.authorize({RepoBacked, %{}}, request(tenant, user)) ==
                {:error, :invalid_permissions}
+
+      assert Authorizer.authorize(
+               {RepoBacked, %{repo: "not_a_repo", permissions: permissions(tenant.id)}},
+               request(tenant, user)
+             ) == {:error, :invalid_repo}
+    end
+
+    test "fails closed when the request omits the current policy version" do
+      tenant = tenant_fixture("repo-authz-missing-policy-version")
+      user = user_fixture(tenant, policy_version: "policy_v12")
+
+      assert Authorizer.authorize(
+               {RepoBacked, %{permissions: permissions(tenant.id)}},
+               request(tenant, user, policy_version: nil)
+             ) == {:error, :missing_user_policy_version}
+    end
+
+    test "denies when the persisted role has no matching permission" do
+      tenant = tenant_fixture("repo-authz-rbac-deny")
+
+      user =
+        user_fixture(tenant,
+          role: "viewer",
+          department_ids: ["finance"],
+          clearance_level: 3,
+          policy_version: "policy_v12"
+        )
+
+      assert {:ok, decision} =
+               Authorizer.authorize(
+                 {RepoBacked, %{permissions: permissions(tenant.id)}},
+                 request(tenant, user)
+               )
+
+      assert decision.decision == :deny
+      assert decision.reason == ["rbac_denied"]
+      assert decision.policy_version == "policy_v12"
+      assert decision.scope == %{}
     end
   end
 
