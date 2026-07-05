@@ -132,6 +132,7 @@ defmodule Arbiter.Policy.Authorizer.Core do
   defp atom_key("role"), do: :role
   defp atom_key("action"), do: :action
   defp atom_key("resource_type"), do: :resource_type
+  defp atom_key("resource_id"), do: :resource_id
   defp atom_key("tenant_id"), do: :tenant_id
   defp atom_key(_key), do: nil
 end
