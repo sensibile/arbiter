@@ -30,6 +30,7 @@
 - DSL 또는 파싱된 AST를 받는 `Arbiter.Policy.Engine`으로 allow/deny decision을 평가합니다.
 - Request subject/action/resource intent가 제공되면 policy `allow` line과 일치하는지 강제합니다.
 - RBAC allow/deny와 ABAC retrieval scope 생성을 분리하는 순수 authorizer contract로 Gateway tool call을 authorize합니다.
+- RBAC 또는 ABAC decision 전에 `Arbiter.Policy.AuthorizationRequest`로 authorizer input을 정규화합니다.
 - decision reason과 policy scope를 생성합니다.
 - 공유 audit/decision reason identifier는 `Arbiter.Policy.DecisionReason`에 둡니다.
 - scope를 SQL predicate와 vector metadata filter로 compile합니다.
@@ -40,6 +41,7 @@
 - Policy 모듈은 `Arbiter.Repo`, HTTP client, vector store, clock, ID generator, process messaging, audit persistence를 호출하지 않아야 합니다.
 - `Arbiter.Policy.Engine`은 parsing과 evaluation 위의 순수 facade입니다. Policy bundle loading이나 external authorizer 실행을 하지 않습니다.
 - 공유 decision reason은 audit row와 lineage record에 저장되므로 안정적인 string identifier로 유지합니다.
+- `Arbiter.Policy.AuthorizationRequest`는 authorizer의 안정적인 request contract입니다. Plain map과 Gateway tool call은 request identity validation 전에 정규화됩니다.
 - 이 boundary 안의 Authorizer 구현은 이미 로드된 request/user/role data를 받아 `Arbiter.Policy.Decision`을 반환합니다. `Arbiter.Policy.Authorizer.Core`는 공유되는 순수 request identity validation, ABAC scope extraction, decision shaping을 소유합니다.
 - Authorizer는 request user id, 로드된 user snapshot id, tenant scope가 일치하지 않으면 fail-close해야 합니다.
 

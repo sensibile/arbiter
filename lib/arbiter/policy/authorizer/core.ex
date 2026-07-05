@@ -7,15 +7,17 @@ defmodule Arbiter.Policy.Authorizer.Core do
   """
 
   alias Arbiter.Policy.Attributes
+  alias Arbiter.Policy.AuthorizationRequest
   alias Arbiter.Policy.Decision
   alias Arbiter.Policy.DecisionReason
 
   def request_scope(request) when is_map(request) do
-    with {:ok, tenant_id} <- fetch_request_string(request, :tenant_id),
-         {:ok, user_id} <- fetch_request_string(request, :user_id),
-         {:ok, action} <- fetch_request_string(request, :action),
-         {:ok, resource_type} <- fetch_request_string(request, :resource_type),
-         {:ok, user_snapshot} <- fetch_user_snapshot(request),
+    with {:ok, %AuthorizationRequest{} = request} <- AuthorizationRequest.normalize(request),
+         tenant_id <- request.tenant_id,
+         user_id <- request.user_id,
+         action <- request.action,
+         resource_type <- request.resource_type,
+         user_snapshot <- request.user_snapshot,
          {:ok, snapshot_user_id} <- fetch_snapshot_string(user_snapshot, "id"),
          {:ok, user_tenant_id} <- fetch_snapshot_string(user_snapshot, "tenant_id"),
          :ok <- validate_user_identity(user_id, snapshot_user_id),
@@ -29,6 +31,7 @@ defmodule Arbiter.Policy.Authorizer.Core do
          snapshot_user_id: snapshot_user_id,
          action: action,
          resource_type: resource_type,
+         resource_id: request.resource_id,
          user_tenant_id: user_tenant_id,
          departments: departments,
          clearance_level: clearance_level,
@@ -78,20 +81,6 @@ defmodule Arbiter.Policy.Authorizer.Core do
 
   defp validate_user_tenant(_request_tenant_id, _user_tenant_id),
     do: {:error, :tenant_scope_mismatch}
-
-  defp fetch_request_string(request, key) do
-    case Map.get(request, key, Map.get(request, Atom.to_string(key))) do
-      value when is_binary(value) and value != "" -> {:ok, value}
-      _missing_or_invalid -> {:error, :"invalid_#{key}"}
-    end
-  end
-
-  defp fetch_user_snapshot(request) do
-    case Map.get(request, :user_snapshot, Map.get(request, "user_snapshot")) do
-      snapshot when is_map(snapshot) -> {:ok, snapshot}
-      _missing_or_invalid -> {:error, :invalid_user_snapshot}
-    end
-  end
 
   defp fetch_snapshot_string(snapshot, key) do
     case Attributes.fetch_required(snapshot, key) do

@@ -6,13 +6,17 @@ defmodule Arbiter.Policy.Authorizer do
   Repo access, external policy engines, clocks, IDs, or audit persistence.
   """
 
-  alias Arbiter.Policy.Decision
+  alias Arbiter.Policy.{AuthorizationRequest, Decision}
 
-  @callback authorize(target :: term(), request :: map()) ::
+  @type request :: AuthorizationRequest.t() | map()
+
+  @callback authorize(target :: term(), request :: request()) ::
               {:ok, Decision.t()} | {:error, term()}
 
-  def authorize({authorizer, target}, request) when is_atom(authorizer) and is_map(request) do
-    authorizer.authorize(target, request)
+  def authorize({authorizer, target}, request) when is_atom(authorizer) do
+    with {:ok, request} <- AuthorizationRequest.normalize(request) do
+      authorizer.authorize(target, request)
+    end
   end
 
   def authorize({_authorizer, _target}, _request), do: {:error, :invalid_authorization_request}

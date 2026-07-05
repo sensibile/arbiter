@@ -62,9 +62,8 @@ defmodule Arbiter.Authorizers.Casbin do
     end
   end
 
-  defp request_tuple(target, request, request_scope) do
-    with {:ok, resource_id} <- fetch_optional_string(request, "resource_id"),
-         {:ok, object} <- object(target, request_scope.resource_type, resource_id) do
+  defp request_tuple(target, _request, request_scope) do
+    with {:ok, object} <- object(target, request_scope.resource_type, request_scope.resource_id) do
       {:ok,
        %{
          tenant_id: request_scope.tenant_id,
@@ -73,17 +72,9 @@ defmodule Arbiter.Authorizers.Casbin do
          subject: subject(target, request_scope.user_id),
          action: request_scope.action,
          resource_type: request_scope.resource_type,
-         resource_id: resource_id,
+         resource_id: request_scope.resource_id,
          object: object
        }}
-    end
-  end
-
-  defp fetch_optional_string(request, key) do
-    case Core.fetch(request, key) do
-      nil -> {:ok, nil}
-      value when is_binary(value) and value != "" -> {:ok, value}
-      _invalid_value -> {:error, :"invalid_#{key}"}
     end
   end
 

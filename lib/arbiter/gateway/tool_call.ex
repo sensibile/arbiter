@@ -24,6 +24,7 @@ defmodule Arbiter.Gateway.ToolCall do
     :tool,
     :action,
     :resource_type,
+    :resource_id,
     :query,
     :user_snapshot,
     :resource_snapshot

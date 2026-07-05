@@ -6,6 +6,7 @@ defmodule Arbiter.Policy do
     exports: [
       AST,
       Attributes,
+      AuthorizationRequest,
       Authorizer,
       Authorizer.Core,
       Authorizer.Static,
