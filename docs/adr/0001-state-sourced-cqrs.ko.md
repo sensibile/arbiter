@@ -106,7 +106,7 @@ pending
 
 Outbox consumer boundary는 사용 가능한 `pending` row를 claim하고, lock timestamp와 증가한 attempt count와 함께 `processing`으로 표시합니다. 이후 projection/cache/index adapter를 실행하고 row를 `processed` 또는 `failed`로 표시합니다. 순수 consumer command는 다음 row 상태를 결정하고, Repo boundary는 row locking, transaction, persistence를 소유합니다.
 
-Terminal marking은 claim ownership을 증명해야 합니다. 현재 skeleton은 claim한 row의 `id`, `attempts`, `locked_at`을 ownership token으로 사용합니다. 이후 worker에서 관측성이 더 필요하면 명시적인 worker id나 lock token을 schema에 추가할 수 있습니다.
+Terminal marking은 claim ownership을 증명해야 합니다. 현재 구현은 claim한 row의 `id`, `attempts`, `locked_at`, 선택적 `locked_by`를 ownership token으로 사용합니다.
 
 Outbox consumer가 호출하는 projection/cache/index adapter는 idempotent해야 합니다. Outbox는 at-least-once propagation mechanism이므로 동일한 command를 다시 처리해도 read model state가 같은 결과로 수렴해야 합니다.
 
@@ -158,6 +158,7 @@ MVP에는 현재 다음 구현이 포함되어 있습니다.
 - User-access invalidation 및 rebuild outbox event를 read model command로 매핑하는 `Arbiter.Sync.OutboxReadModelDispatch`
 - Pending outbox row를 claim하고 지원되는 read model command를 dispatch한 뒤 row를 processed 또는 failed로 표시하는 bounded pass인 `Arbiter.Sync.OutboxProcessor.run_once/2`
 - Bounded outbox processing pass를 선택적으로 supervised scheduling하는 `Arbiter.Sync.OutboxWorker`
+- Worker-visible claim provenance와 terminal update 검사를 위한 선택적 `locked_by` outbox ownership
 - Duration, status, limit, aggregate count만 포함하는 `[:arbiter, :sync, :outbox, :processor, :run]` outbox processor telemetry
 - 기존 row를 invalidation한 뒤 현재 user와 chunk 상태에서 active projection을 다시 만드는 `Arbiter.ReadModels.rebuild_user_access_projection/4` 기반 `rebuild_user_access_projection` 실행
 - User/resource policy version에 대한 Gateway stale snapshot check

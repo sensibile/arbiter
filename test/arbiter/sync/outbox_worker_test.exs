@@ -43,6 +43,56 @@ defmodule Arbiter.Sync.OutboxWorkerTest do
     assert %{last_result: {:error, :database_unavailable}} = :sys.get_state(pid)
   end
 
+  test "passes configured worker ownership to the processor" do
+    parent = self()
+
+    processor = fn _limit, opts ->
+      send(parent, {:processor_opts, opts})
+      {:ok, %{claimed: 0}}
+    end
+
+    pid =
+      start_supervised!(
+        {OutboxWorker,
+         name: unique_name(),
+         limit: 1,
+         interval_ms: @interval_ms,
+         worker_id: "worker-a",
+         processor: processor,
+         processor_opts: [now: ~U[2026-06-24 03:00:00Z]]}
+      )
+
+    send(pid, :process_outbox)
+
+    assert_receive {:processor_opts, opts}
+    assert Keyword.fetch!(opts, :now) == ~U[2026-06-24 03:00:00Z]
+    assert Keyword.fetch!(opts, :worker_id) == "worker-a"
+  end
+
+  test "does not override an explicit processor worker id" do
+    parent = self()
+
+    processor = fn _limit, opts ->
+      send(parent, {:processor_opts, opts})
+      {:ok, %{claimed: 0}}
+    end
+
+    pid =
+      start_supervised!(
+        {OutboxWorker,
+         name: unique_name(),
+         limit: 1,
+         interval_ms: @interval_ms,
+         worker_id: "worker-a",
+         processor: processor,
+         processor_opts: [worker_id: "processor-worker"]}
+      )
+
+    send(pid, :process_outbox)
+
+    assert_receive {:processor_opts, [worker_id: "processor-worker"]}
+  end
+
   test "rejects invalid scheduling options" do
     assert {:error, {{:invalid_outbox_worker_option, :limit}, _child}} =
              start_supervised(

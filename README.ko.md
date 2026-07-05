@@ -94,9 +94,12 @@ Supervised outbox worker는 기본적으로 비활성화되어 있습니다. App
 ```elixir
 config :arbiter, Arbiter.Sync.OutboxWorker,
   enabled: true,
+  worker_id: "worker-a",
   interval_ms: 5_000,
   limit: 100
 ```
+
+`worker_id`는 선택 사항입니다. 값이 있으면 claim된 outbox row의 `locked_by`에 저장되고, terminal update는 이 ownership token까지 일치해야 합니다.
 
 각 outbox processing pass는 duration, status, limit, aggregate row count만 담은 `[:arbiter, :sync, :outbox, :processor, :run]` telemetry를 방출합니다.
 

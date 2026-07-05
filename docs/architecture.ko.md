@@ -121,7 +121,7 @@
 - `Arbiter.Sync.OutboxProcessor.run_once/2`를 통해 bounded outbox processing pass를 한 번 실행합니다.
 - `Arbiter.Sync.OutboxWorker`를 통해 periodic bounded outbox processing을 선택적으로 schedule합니다. 이 worker는 기본적으로 비활성화되어 있고 process scheduling만 소유합니다.
 - 각 processing pass마다 duration과 집계 row count를 담은 `[:arbiter, :sync, :outbox, :processor, :run]` telemetry를 방출합니다.
-- Persisted `id`, `attempts`, `locked_at`이 claim한 row와 여전히 일치할 때만 claimed row를 terminal 상태로 표시합니다.
+- Persisted `id`, `attempts`, `locked_at`, 선택적 `locked_by`가 claim한 row와 여전히 일치할 때만 claimed row를 terminal 상태로 표시합니다.
 - `invalidate_user_access_cache` event를 `Arbiter.ReadModels.invalidate_user_access/4`로 dispatch해서 revoke 후 오래된 `accessible_document_chunks` row를 invalidation합니다.
 - `rebuild_user_access_projection` event를 `Arbiter.ReadModels.rebuild_user_access_projection/4`로 dispatch합니다. 이 함수는 tenant/user/policy version에 해당하는 기존 row를 invalidation한 뒤 현재 user와 chunk 상태에서 active projection을 다시 만듭니다.
 - 요청한 user source가 없거나 policy version이 stale이거나 scope가 잘못된 경우 read model rebuild를 fail-closed 처리합니다.
@@ -131,7 +131,7 @@
 - 이 boundary는 propagation command를 outbox row로 저장하고 outbox status persistence를 소유합니다. 실제 cache/process, vector, search adapter는 policy와 retrieval core 바깥에 두어야 합니다.
 - `Arbiter.Sync.OutboxConsumerCommand`는 Repo, clock, process, cache adapter, vector/search adapter를 호출하지 않아야 합니다. 호출자가 timestamp를 데이터로 전달합니다.
 - `Arbiter.Sync.OutboxReadModelDispatch`는 순수 모듈로 유지해야 합니다. Event payload를 검증하고 read model command를 반환하지만 `Arbiter.Repo` 또는 `Arbiter.ReadModels`를 호출하지 않습니다.
-- `Arbiter.Sync.OutboxWorker`는 read model command 세부사항을 알지 않아야 합니다. 설정된 limit과 interval로 `Arbiter.Sync.OutboxProcessor.run_once/2`만 schedule합니다.
+- `Arbiter.Sync.OutboxWorker`는 read model command 세부사항을 알지 않아야 합니다. 설정된 limit, interval, 선택적 worker ownership으로 `Arbiter.Sync.OutboxProcessor.run_once/2`만 schedule합니다.
 - Outbox telemetry에는 tenant, user, aggregate, payload, row identifier를 포함하지 않아야 합니다. Pass status, limit, duration, aggregate count만 노출합니다.
 
 ### 저장소 전략

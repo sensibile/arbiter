@@ -20,6 +20,7 @@ defmodule Arbiter.Sync.OutboxEvent do
     field :attempts, :integer, default: 0
     field :available_at, :utc_datetime
     field :locked_at, :utc_datetime
+    field :locked_by, :string
     field :processed_at, :utc_datetime
     field :last_error, :string
 
@@ -47,6 +48,7 @@ defmodule Arbiter.Sync.OutboxEvent do
       :attempts,
       :available_at,
       :locked_at,
+      :locked_by,
       :processed_at,
       :last_error
     ])

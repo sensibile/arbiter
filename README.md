@@ -95,9 +95,13 @@ you want the app process to run bounded read model propagation passes:
 ```elixir
 config :arbiter, Arbiter.Sync.OutboxWorker,
   enabled: true,
+  worker_id: "worker-a",
   interval_ms: 5_000,
   limit: 100
 ```
+
+`worker_id` is optional. When present, claimed outbox rows store it in
+`locked_by` and terminal updates must match that ownership token.
 
 Each outbox processing pass emits `[:arbiter, :sync, :outbox, :processor, :run]`
 telemetry with duration, status, limit, and aggregate row counts only.

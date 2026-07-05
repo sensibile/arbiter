@@ -121,7 +121,7 @@ Responsibilities:
 - Run one bounded outbox processing pass through `Arbiter.Sync.OutboxProcessor.run_once/2`.
 - Optionally schedule periodic bounded outbox processing through `Arbiter.Sync.OutboxWorker`; it is disabled by default and owns only process scheduling.
 - Emit `[:arbiter, :sync, :outbox, :processor, :run]` telemetry for each processing pass with duration and aggregate row counts.
-- Mark claimed rows as terminal only when the persisted `id`, `attempts`, and `locked_at` still match the claimed row.
+- Mark claimed rows as terminal only when the persisted `id`, `attempts`, `locked_at`, and optional `locked_by` still match the claimed row.
 - Dispatch `invalidate_user_access_cache` events to `Arbiter.ReadModels.invalidate_user_access/4` so old `accessible_document_chunks` rows are invalidated after revoke.
 - Dispatch `rebuild_user_access_projection` events to `Arbiter.ReadModels.rebuild_user_access_projection/4`, which invalidates old rows for the tenant/user/policy version and rebuilds active projections from current user and chunk state.
 - Fail read model rebuilds closed when the requested user source is missing, policy-version stale, or scope malformed.
@@ -131,7 +131,7 @@ Boundary rule:
 - This boundary persists propagation commands as outbox rows and owns outbox status persistence. Real cache/process, vector, and search adapters should remain outside the policy and retrieval core.
 - `Arbiter.Sync.OutboxConsumerCommand` must not call Repo, clocks, processes, cache adapters, or vector/search adapters. Callers pass timestamps in as data.
 - `Arbiter.Sync.OutboxReadModelDispatch` must stay pure. It validates event payloads and returns read model commands, but does not call `Arbiter.Repo` or `Arbiter.ReadModels`.
-- `Arbiter.Sync.OutboxWorker` must not know read model command details. It schedules `Arbiter.Sync.OutboxProcessor.run_once/2` with configured limits and intervals.
+- `Arbiter.Sync.OutboxWorker` must not know read model command details. It schedules `Arbiter.Sync.OutboxProcessor.run_once/2` with configured limits, intervals, and optional worker ownership.
 - Outbox telemetry must not include tenant, user, aggregate, payload, or row identifiers; expose only pass status, limit, duration, and aggregate counts.
 
 ### Storage Strategy

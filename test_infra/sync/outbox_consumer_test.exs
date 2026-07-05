@@ -30,9 +30,22 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
       assert claimed.status == "processing"
       assert claimed.attempts == 1
       assert claimed.locked_at == @now
+      assert claimed.locked_by == nil
       assert claimed.processed_at == nil
 
       assert Repo.get!(OutboxEvent, ready.id).status == "processing"
+    end
+
+    test "records optional worker ownership when claiming rows" do
+      tenant = tenant_fixture("outbox-consumer-tenant")
+      ready = outbox_event_fixture(tenant, available_at: ~U[2026-06-24 01:00:00Z])
+
+      assert {:ok, [claimed]} =
+               OutboxConsumer.claim_available(10, now: @now, worker_id: "worker-a")
+
+      assert claimed.id == ready.id
+      assert claimed.locked_by == "worker-a"
+      assert Repo.get!(OutboxEvent, ready.id).locked_by == "worker-a"
     end
 
     test "rejects invalid claim limits" do
@@ -54,6 +67,7 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
       assert processed.status == "processed"
       assert processed.processed_at == @now
       assert processed.locked_at == nil
+      assert processed.locked_by == nil
       assert processed.last_error == nil
 
       failed_event =
@@ -65,6 +79,7 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
       assert failed.status == "failed"
       assert failed.processed_at == @now
       assert failed.locked_at == nil
+      assert failed.locked_by == nil
       assert failed.last_error == "cache unavailable"
     end
 
@@ -86,6 +101,22 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
 
       claimed
       |> OutboxEvent.changeset(%{locked_at: ~U[2026-06-24 01:01:00Z]})
+      |> Repo.update!()
+
+      assert OutboxConsumer.mark_processed(claimed, now: @now) == {:error, :claim_mismatch}
+      assert Repo.get!(OutboxEvent, claimed.id).status == "processing"
+    end
+
+    test "rejects terminal marking when worker ownership does not match" do
+      tenant = tenant_fixture("outbox-consumer-tenant")
+
+      claimed =
+        tenant
+        |> outbox_event_fixture()
+        |> claim!(worker_id: "worker-a")
+
+      claimed
+      |> OutboxEvent.changeset(%{locked_by: "worker-b"})
       |> Repo.update!()
 
       assert OutboxConsumer.mark_processed(claimed, now: @now) == {:error, :claim_mismatch}
@@ -186,8 +217,8 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
     end
   end
 
-  defp claim!(event) do
-    assert {:ok, [claimed]} = OutboxConsumer.claim_available(1, now: @now)
+  defp claim!(event, opts \\ []) do
+    assert {:ok, [claimed]} = OutboxConsumer.claim_available(1, Keyword.put(opts, :now, @now))
     assert claimed.id == event.id
     claimed
   end

@@ -23,11 +23,15 @@ defmodule Arbiter.Sync.OutboxWorker do
     with {:ok, limit} <- positive_integer(opts, :limit, @default_limit),
          {:ok, interval_ms} <- positive_integer(opts, :interval_ms, @default_interval_ms),
          {:ok, processor} <- processor(opts) do
-      processor_opts = Keyword.get(opts, :processor_opts, [])
+      processor_opts =
+        opts
+        |> Keyword.get(:processor_opts, [])
+        |> maybe_put_worker_id(Keyword.get(opts, :worker_id))
 
       state = %{
         limit: limit,
         interval_ms: interval_ms,
+        worker_id: Keyword.get(opts, :worker_id),
         processor: processor,
         processor_opts: processor_opts,
         timer_ref: nil,
@@ -63,6 +67,11 @@ defmodule Arbiter.Sync.OutboxWorker do
       {:stop, {:invalid_outbox_worker_option, :processor}}
     end
   end
+
+  defp maybe_put_worker_id(processor_opts, nil), do: processor_opts
+
+  defp maybe_put_worker_id(processor_opts, worker_id),
+    do: Keyword.put_new(processor_opts, :worker_id, worker_id)
 
   defp schedule_next(state) do
     timer_ref = Process.send_after(self(), :process_outbox, state.interval_ms)

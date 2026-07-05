@@ -106,7 +106,7 @@ pending
 
 The outbox consumer boundary claims available `pending` rows, marks them `processing` with a lock timestamp and incremented attempt count, executes the matching projection/cache/index adapter, then marks the row `processed` or `failed`. The pure consumer command decides the next row state; the Repo boundary owns row locking, transactions, and persistence.
 
-Terminal marking must prove claim ownership. The current skeleton uses the claimed row's `id`, `attempts`, and `locked_at` as the ownership token; a later worker may replace that with an explicit worker id or lock token if the schema needs stronger observability.
+Terminal marking must prove claim ownership. The current implementation uses the claimed row's `id`, `attempts`, `locked_at`, and optional `locked_by` as the ownership token.
 
 Projection/cache/index adapters invoked by the outbox consumer must be idempotent. Reprocessing an equivalent command must converge on the same read model state, because the outbox is an at-least-once propagation mechanism.
 
@@ -158,6 +158,7 @@ The MVP currently includes:
 - `Arbiter.Sync.OutboxReadModelDispatch` for mapping user-access invalidation and rebuild outbox events to read model commands.
 - `Arbiter.Sync.OutboxProcessor.run_once/2` for one bounded pass that claims pending outbox rows, dispatches supported read model commands, and marks rows processed or failed.
 - `Arbiter.Sync.OutboxWorker` for optional supervised scheduling of bounded outbox processing passes.
+- Optional `locked_by` outbox ownership for worker-visible claim provenance and terminal update checks.
 - Outbox processor telemetry on `[:arbiter, :sync, :outbox, :processor, :run]` with duration, status, limit, and aggregate counts only.
 - `rebuild_user_access_projection` execution through `Arbiter.ReadModels.rebuild_user_access_projection/4`, which invalidates old rows and rebuilds active projections from current user and chunk state.
 - Gateway stale snapshot checks for user and resource policy versions.

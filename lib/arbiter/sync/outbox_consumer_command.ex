@@ -8,7 +8,9 @@ defmodule Arbiter.Sync.OutboxConsumerCommand do
 
   alias Arbiter.Sync.OutboxEvent
 
-  def claim(%OutboxEvent{} = event, %DateTime{} = now) do
+  def claim(event, now, opts \\ [])
+
+  def claim(%OutboxEvent{} = event, %DateTime{} = now, opts) do
     cond do
       event.status != OutboxEvent.status_pending() ->
         {:error, :not_pending}
@@ -22,13 +24,14 @@ defmodule Arbiter.Sync.OutboxConsumerCommand do
            status: OutboxEvent.status_processing(),
            attempts: event.attempts + 1,
            locked_at: now,
+           locked_by: Keyword.get(opts, :worker_id),
            processed_at: nil,
            last_error: nil
          }}
     end
   end
 
-  def claim(_event, _now), do: {:error, :invalid_outbox_event}
+  def claim(_event, _now, _opts), do: {:error, :invalid_outbox_event}
 
   def mark_processed(%OutboxEvent{} = event, %DateTime{} = now) do
     with :ok <- require_processing(event) do
@@ -37,6 +40,7 @@ defmodule Arbiter.Sync.OutboxConsumerCommand do
          status: OutboxEvent.status_processed(),
          processed_at: now,
          locked_at: nil,
+         locked_by: nil,
          last_error: nil
        }}
     end
@@ -51,6 +55,7 @@ defmodule Arbiter.Sync.OutboxConsumerCommand do
          status: OutboxEvent.status_failed(),
          processed_at: now,
          locked_at: nil,
+         locked_by: nil,
          last_error: normalize_error(error)
        }}
     end

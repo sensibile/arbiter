@@ -19,6 +19,7 @@ defmodule Arbiter.Sync.OutboxConsumer do
 
   def claim_available(limit, opts) when is_integer(limit) and limit > 0 do
     now = Keyword.get_lazy(opts, :now, &default_now/0)
+    claim_opts = Keyword.take(opts, [:worker_id])
 
     Repo.transaction(fn ->
       OutboxEvent
@@ -28,7 +29,7 @@ defmodule Arbiter.Sync.OutboxConsumer do
       |> limit(^limit)
       |> lock("FOR UPDATE SKIP LOCKED")
       |> Repo.all()
-      |> Enum.map(&claim_event!(&1, now))
+      |> Enum.map(&claim_event!(&1, now, claim_opts))
     end)
   end
 
@@ -57,8 +58,8 @@ defmodule Arbiter.Sync.OutboxConsumer do
     |> mark_processed_or_failed(event, now)
   end
 
-  defp claim_event!(event, now) do
-    {:ok, attrs} = OutboxConsumerCommand.claim(event, now)
+  defp claim_event!(event, now, claim_opts) do
+    {:ok, attrs} = OutboxConsumerCommand.claim(event, now, claim_opts)
 
     event
     |> OutboxEvent.changeset(attrs)
@@ -74,6 +75,7 @@ defmodule Arbiter.Sync.OutboxConsumer do
       |> where([row], row.status == ^OutboxEvent.status_processing())
       |> where([row], row.attempts == ^event.attempts)
       |> where([row], row.locked_at == ^event.locked_at)
+      |> where_locked_by(event.locked_by)
       |> Repo.update_all(set: Map.to_list(updates))
 
     case updated_count do
@@ -83,6 +85,9 @@ defmodule Arbiter.Sync.OutboxConsumer do
   end
 
   defp update_claimed_from_command(_event, {:error, reason}), do: {:error, reason}
+
+  defp where_locked_by(query, nil), do: where(query, [row], is_nil(row.locked_by))
+  defp where_locked_by(query, locked_by), do: where(query, [row], row.locked_by == ^locked_by)
 
   defp execute_read_model_command({:ok, %{operation: :invalidate_user_access} = command}) do
     ReadModels.invalidate_user_access(

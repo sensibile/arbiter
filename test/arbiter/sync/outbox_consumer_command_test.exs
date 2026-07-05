@@ -21,9 +21,21 @@ defmodule Arbiter.Sync.OutboxConsumerCommandTest do
                status: "processing",
                attempts: 2,
                locked_at: @now,
+               locked_by: nil,
                processed_at: nil,
                last_error: nil
              }
+    end
+
+    test "stores an optional worker id on claim" do
+      event =
+        outbox_event(
+          status: OutboxEvent.status_pending(),
+          available_at: ~U[2026-06-24 01:00:00Z]
+        )
+
+      assert {:ok, attrs} = OutboxConsumerCommand.claim(event, @now, worker_id: "worker-a")
+      assert attrs.locked_by == "worker-a"
     end
 
     test "does not claim unavailable pending events" do
@@ -58,6 +70,7 @@ defmodule Arbiter.Sync.OutboxConsumerCommandTest do
                status: "processed",
                processed_at: @now,
                locked_at: nil,
+               locked_by: nil,
                last_error: nil
              }
     end
@@ -84,6 +97,7 @@ defmodule Arbiter.Sync.OutboxConsumerCommandTest do
                status: "failed",
                processed_at: @now,
                locked_at: nil,
+               locked_by: nil,
                last_error: "projection_missing"
              }
     end
@@ -128,6 +142,7 @@ defmodule Arbiter.Sync.OutboxConsumerCommandTest do
       attempts: 0,
       available_at: @now,
       locked_at: nil,
+      locked_by: nil,
       processed_at: nil,
       last_error: nil
     }
