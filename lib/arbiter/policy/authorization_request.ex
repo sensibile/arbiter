@@ -37,7 +37,11 @@ defmodule Arbiter.Policy.AuthorizationRequest do
   @required_string_fields [:tenant_id, :user_id, :action, :resource_type]
   @optional_string_fields [:agent_run_id, :tool, :resource_id]
 
-  def normalize(%__MODULE__{} = request), do: {:ok, request}
+  def normalize(%__MODULE__{} = request) do
+    request
+    |> Map.from_struct()
+    |> normalize()
+  end
 
   def normalize(request) when is_map(request) do
     with {:ok, attrs} <- fetch_required_strings(request),

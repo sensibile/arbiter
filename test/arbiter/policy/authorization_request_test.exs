@@ -58,8 +58,18 @@ defmodule Arbiter.Policy.AuthorizationRequestTest do
              {:error, :invalid_query}
   end
 
+  test "revalidates already-built request structs" do
+    request = struct!(AuthorizationRequest, Map.put(valid_attrs(), :tenant_id, ""))
+
+    assert AuthorizationRequest.normalize(request) == {:error, :invalid_tenant_id}
+  end
+
   defp tool_call(attrs \\ []) do
-    defaults = %{
+    struct!(ToolCall, Map.merge(valid_attrs(), Map.new(attrs)))
+  end
+
+  defp valid_attrs do
+    %{
       tenant_id: "tenant_a",
       user_id: "user_123",
       agent_run_id: "run_456",
@@ -75,7 +85,5 @@ defmodule Arbiter.Policy.AuthorizationRequestTest do
       },
       resource_snapshot: %{"resource_type" => "document_chunk"}
     }
-
-    struct!(ToolCall, Map.merge(defaults, Map.new(attrs)))
   end
 end
