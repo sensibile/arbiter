@@ -37,6 +37,7 @@
 
 - Policy 모듈은 `Arbiter.Repo`, HTTP client, vector store, clock, ID generator, process messaging, audit persistence를 호출하지 않아야 합니다.
 - 이 boundary 안의 Authorizer 구현은 이미 로드된 request/user/role data를 받아 `Arbiter.Policy.Decision`을 반환합니다. Repo 기반 role store, Casbin, SaaS IAM, policy bundle loading은 이후 shell boundary가 소유합니다.
+- Authorizer는 request user id, 로드된 user snapshot id, tenant scope가 일치하지 않으면 fail-close해야 합니다.
 
 ### Retrieval Core
 

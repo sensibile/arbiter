@@ -35,12 +35,25 @@ defmodule Arbiter.Policy.Authorizer.StaticTest do
       assert Authorizer.authorize(
                {Static, policy()},
                request(user_snapshot: %{"tenant_id" => "tenant_b"})
-             ) == {:error, :missing_user_department_ids}
+             ) == {:error, :missing_user_id}
 
       assert Authorizer.authorize(
                {Static, policy()},
                request(
                  user_snapshot: %{
+                   "id" => "user_999",
+                   "tenant_id" => "tenant_a",
+                   "department_ids" => ["finance"],
+                   "clearance_level" => 3
+                 }
+               )
+             ) == {:error, :user_id_mismatch}
+
+      assert Authorizer.authorize(
+               {Static, policy()},
+               request(
+                 user_snapshot: %{
+                   "id" => "user_123",
                    "tenant_id" => "tenant_b",
                    "department_ids" => ["finance"],
                    "clearance_level" => 3
@@ -52,6 +65,7 @@ defmodule Arbiter.Policy.Authorizer.StaticTest do
                {Static, policy()},
                request(
                  user_snapshot: %{
+                   "id" => "user_123",
                    "tenant_id" => "tenant_a",
                    "department_ids" => ["finance"],
                    "clearance_level" => "high"
@@ -73,6 +87,16 @@ defmodule Arbiter.Policy.Authorizer.StaticTest do
       authorize = Authorizer.executor({Static, policy()})
 
       assert {:ok, decision} = authorize.(request())
+      assert decision.decision == :allow
+    end
+
+    test "supports plain request maps with string keys" do
+      request =
+        request()
+        |> Map.from_struct()
+        |> Map.new(fn {key, value} -> {Atom.to_string(key), value} end)
+
+      assert {:ok, decision} = Authorizer.authorize({Static, policy()}, request)
       assert decision.decision == :allow
     end
   end

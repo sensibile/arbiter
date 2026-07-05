@@ -37,6 +37,7 @@ Boundary rule:
 
 - Policy modules should not call `Arbiter.Repo`, HTTP clients, vector stores, clocks, ID generators, process messaging, or audit persistence.
 - Authorizer implementations in this boundary receive already-loaded request/user/role data and return `Arbiter.Policy.Decision` values. Repo-backed role stores, Casbin, SaaS IAM, and policy bundle loading belong in later shell boundaries.
+- Authorizers must fail closed when the request user id, loaded user snapshot id, or tenant scope do not match.
 
 ### Retrieval Core
 

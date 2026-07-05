@@ -14,8 +14,10 @@ defmodule Arbiter.Policy.Authorizer.Static do
   @impl Arbiter.Policy.Authorizer
   def authorize(policy, request) when is_map(policy) and is_map(request) do
     with {:ok, policy_version} <- fetch_policy_string(policy, "policy_version"),
-         {:ok, request_scope} <- request_scope(request),
+         {:ok, request_scope} <- request_identity_scope(request),
+         :ok <- validate_user_identity(request_scope),
          :ok <- validate_user_tenant(request_scope),
+         {:ok, request_scope} <- put_abac_scope(request_scope),
          {:ok, roles} <- roles_for(policy, request_scope.user_id),
          :ok <- permit?(policy, roles, request_scope) do
       {:ok, allow(policy_version, request_scope, roles)}
@@ -27,30 +29,42 @@ defmodule Arbiter.Policy.Authorizer.Static do
 
   def authorize(_policy, _request), do: {:error, :invalid_authorization_input}
 
-  defp request_scope(request) do
+  defp request_identity_scope(request) do
     with {:ok, tenant_id} <- fetch_request_string(request, :tenant_id),
          {:ok, user_id} <- fetch_request_string(request, :user_id),
          {:ok, action} <- fetch_request_string(request, :action),
          {:ok, resource_type} <- fetch_request_string(request, :resource_type),
          {:ok, user_snapshot} <- fetch_user_snapshot(request),
-         {:ok, user_tenant_id} <- fetch_snapshot_string(user_snapshot, "tenant_id"),
-         {:ok, departments} <- fetch_departments(user_snapshot),
-         {:ok, clearance_level} <- fetch_clearance_level(user_snapshot) do
+         {:ok, snapshot_user_id} <- fetch_snapshot_string(user_snapshot, "id"),
+         {:ok, user_tenant_id} <- fetch_snapshot_string(user_snapshot, "tenant_id") do
       {:ok,
        %{
          tenant_id: tenant_id,
          user_id: user_id,
+         snapshot_user_id: snapshot_user_id,
          action: action,
          resource_type: resource_type,
          user_tenant_id: user_tenant_id,
-         departments: departments,
-         clearance_level: clearance_level
+         user_snapshot: user_snapshot
        }}
     end
   end
 
+  defp validate_user_identity(%{user_id: user_id, snapshot_user_id: user_id}), do: :ok
+  defp validate_user_identity(_scope), do: {:error, :user_id_mismatch}
+
   defp validate_user_tenant(%{tenant_id: tenant_id, user_tenant_id: tenant_id}), do: :ok
   defp validate_user_tenant(_scope), do: {:error, :tenant_scope_mismatch}
+
+  defp put_abac_scope(%{user_snapshot: user_snapshot} = request_scope) do
+    with {:ok, departments} <- fetch_departments(user_snapshot),
+         {:ok, clearance_level} <- fetch_clearance_level(user_snapshot) do
+      {:ok,
+       request_scope
+       |> Map.put(:departments, departments)
+       |> Map.put(:clearance_level, clearance_level)}
+    end
+  end
 
   defp roles_for(policy, user_id) do
     role_assignments =
@@ -123,14 +137,14 @@ defmodule Arbiter.Policy.Authorizer.Static do
   end
 
   defp fetch_request_string(request, key) do
-    case Map.get(request, key) do
+    case Map.get(request, key, Map.get(request, Atom.to_string(key))) do
       value when is_binary(value) and value != "" -> {:ok, value}
       _missing_or_invalid -> {:error, :"invalid_#{key}"}
     end
   end
 
   defp fetch_user_snapshot(request) do
-    case Map.get(request, :user_snapshot) do
+    case Map.get(request, :user_snapshot, Map.get(request, "user_snapshot")) do
       snapshot when is_map(snapshot) -> {:ok, snapshot}
       _missing_or_invalid -> {:error, :invalid_user_snapshot}
     end
