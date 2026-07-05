@@ -98,7 +98,23 @@ Responsibilities:
 Boundary rule:
 
 - Gateway may orchestrate injected functions, but should not directly call Repo, vector stores, SaaS tools, HTTP clients, caches, clocks, or ID generators.
+- Gateway does not emit telemetry directly; observed execution goes through `Arbiter.Observability.GatewayTelemetry`.
 - Gateway receives an authorization function and must not directly own RBAC role lookup, ABAC attribute loading, policy storage, or external authorizer clients.
+
+### Observability Boundary
+
+Owned by `Arbiter.Observability.*`.
+
+Responsibilities:
+
+- Wrap Gateway tool calls when runtime telemetry is desired.
+- Emit `[:arbiter, :gateway, :tool_call, :run]` telemetry with duration and chunk count measurements.
+- Keep telemetry metadata bounded to status, decision, primary reason, tool, action, resource type, and policy version.
+
+Boundary rule:
+
+- Observability modules may emit telemetry, but must not persist audit records or call Repo, policy stores, vector/search adapters, caches, HTTP clients, clocks, or ID generators.
+- Gateway telemetry must not include tenant, user, agent run, query, prompt, chunk, payload, or row identifiers.
 
 ### Audit Boundary
 

@@ -98,7 +98,23 @@
 경계 규칙:
 
 - Gateway는 주입된 함수를 orchestration할 수 있지만 Repo, vector store, SaaS tool, HTTP client, cache, clock, ID generator를 직접 호출하지 않아야 합니다.
+- Gateway는 telemetry를 직접 방출하지 않습니다. 관측이 필요한 실행은 `Arbiter.Observability.GatewayTelemetry`를 통합니다.
 - Gateway는 authorization 함수를 주입받으며 RBAC role lookup, ABAC attribute loading, policy storage, external authorizer client를 직접 소유하지 않아야 합니다.
+
+### Observability Boundary
+
+소유 모듈: `Arbiter.Observability.*`
+
+책임:
+
+- Runtime telemetry가 필요할 때 Gateway tool call을 감쌉니다.
+- Duration과 chunk count measurement를 담은 `[:arbiter, :gateway, :tool_call, :run]` telemetry를 방출합니다.
+- Telemetry metadata는 status, decision, primary reason, tool, action, resource type, policy version으로 제한합니다.
+
+경계 규칙:
+
+- Observability 모듈은 telemetry를 방출할 수 있지만 audit record를 저장하거나 Repo, policy store, vector/search adapter, cache, HTTP client, clock, ID generator를 호출하지 않아야 합니다.
+- Gateway telemetry에는 tenant, user, agent run, query, prompt, chunk, payload, row identifier를 포함하지 않아야 합니다.
 
 ### Audit Boundary
 

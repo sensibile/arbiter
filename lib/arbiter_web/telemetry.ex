@@ -98,6 +98,25 @@ defmodule ArbiterWeb.Telemetry do
         description: "Outbox rows or passes that ended in processor errors"
       ),
 
+      # Arbiter Gateway Metrics
+      summary("arbiter.gateway.tool_call.run.duration",
+        tags: [:status, :decision, :tool, :action, :resource_type],
+        unit: {:native, :millisecond},
+        description: "Duration of one observed Gateway tool call"
+      ),
+      sum("arbiter.gateway.tool_call.run.retrieved_chunks",
+        tags: [:status, :decision, :tool, :action, :resource_type],
+        description: "Chunks returned by observed Gateway tool calls before post-validation"
+      ),
+      sum("arbiter.gateway.tool_call.run.accepted_chunks",
+        tags: [:status, :decision, :tool, :action, :resource_type],
+        description: "Chunks accepted by observed Gateway tool calls"
+      ),
+      sum("arbiter.gateway.tool_call.run.rejected_chunks",
+        tags: [:status, :decision, :tool, :action, :resource_type],
+        description: "Chunks rejected by observed Gateway tool calls"
+      ),
+
       # VM Metrics
       summary("vm.memory.total", unit: {:byte, :kilobyte}),
       summary("vm.total_run_queue_lengths.total"),

@@ -135,6 +135,12 @@ config :arbiter, Arbiter.Sync.OutboxWorker,
 Each outbox processing pass emits `[:arbiter, :sync, :outbox, :processor, :run]`
 telemetry with duration, status, limit, and aggregate row counts only.
 
+Gateway runtime telemetry is available through
+`Arbiter.Observability.GatewayTelemetry.run_tool_call/2`. It emits
+`[:arbiter, :gateway, :tool_call, :run]` with duration and chunk counts plus
+bounded metadata only. It must not include tenant, user, agent run, query, or
+chunk identifiers.
+
 ## Architecture Checks
 
 Boundary enforcement runs during compilation through the `:boundary` compiler.

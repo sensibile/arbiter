@@ -132,6 +132,8 @@ config :arbiter, Arbiter.Sync.OutboxWorker,
 
 각 outbox processing pass는 duration, status, limit, aggregate row count만 담은 `[:arbiter, :sync, :outbox, :processor, :run]` telemetry를 방출합니다.
 
+Gateway runtime telemetry는 `Arbiter.Observability.GatewayTelemetry.run_tool_call/2`를 통해 사용할 수 있습니다. 이 함수는 duration, chunk count, 제한된 metadata만 담은 `[:arbiter, :gateway, :tool_call, :run]` telemetry를 방출합니다. Tenant, user, agent run, query, chunk identifier는 포함하지 않아야 합니다.
+
 ## 아키텍처 검사
 
 Boundary enforcement는 `:boundary` compiler를 통해 compilation 중 실행됩니다. 선언된 boundary group을 검토할 때는 다음 명령을 사용합니다.

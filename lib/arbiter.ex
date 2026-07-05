@@ -9,6 +9,7 @@ defmodule Arbiter do
       Audit,
       Documents,
       Gateway,
+      Observability,
       Policy,
       ReadModels,
       Repo,
