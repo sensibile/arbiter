@@ -24,6 +24,25 @@ defmodule Arbiter.Sync.OutboxReadModelDispatch do
     end
   end
 
+  def command(
+        %OutboxEvent{event_type: "rebuild_user_access_projection"} = event,
+        %DateTime{} = now
+      ) do
+    with :ok <- require_user_aggregate(event),
+         {:ok, tenant_id} <- matching_payload_id(event, "tenant_id", event.tenant_id),
+         {:ok, user_id} <- matching_payload_id(event, "user_id", event.aggregate_id),
+         {:ok, user_policy_version} <- fetch_payload_string(event, "user_policy_version") do
+      {:ok,
+       %{
+         operation: :rebuild_user_access_projection,
+         tenant_id: tenant_id,
+         user_id: user_id,
+         user_policy_version: user_policy_version,
+         rebuild_requested_at: now
+       }}
+    end
+  end
+
   def command(%OutboxEvent{}, %DateTime{}), do: {:error, :unsupported_read_model_command}
   def command(_event, _now), do: {:error, :invalid_outbox_event}
 

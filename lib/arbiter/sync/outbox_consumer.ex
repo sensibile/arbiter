@@ -92,6 +92,9 @@ defmodule Arbiter.Sync.OutboxConsumer do
     )
   end
 
+  defp execute_read_model_command({:ok, %{operation: _operation}}),
+    do: {:error, :unsupported_read_model_operation}
+
   defp execute_read_model_command({:error, reason}), do: {:error, reason}
 
   defp mark_processed_or_failed({:ok, _result}, event, now), do: mark_processed(event, now: now)

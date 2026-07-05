@@ -36,6 +36,34 @@ defmodule Arbiter.Sync.OutboxReadModelDispatchTest do
                 }}
     end
 
+    test "maps user access rebuild events to read model rebuild commands" do
+      tenant_id = Ecto.UUID.generate()
+      user_id = Ecto.UUID.generate()
+
+      event =
+        outbox_event(
+          tenant_id: tenant_id,
+          aggregate_type: "user",
+          aggregate_id: user_id,
+          event_type: "rebuild_user_access_projection",
+          payload: %{
+            "tenant_id" => tenant_id,
+            "user_id" => user_id,
+            "user_policy_version" => "policy_v13"
+          }
+        )
+
+      assert OutboxReadModelDispatch.command(event, @now) ==
+               {:ok,
+                %{
+                  operation: :rebuild_user_access_projection,
+                  tenant_id: tenant_id,
+                  user_id: user_id,
+                  user_policy_version: "policy_v13",
+                  rebuild_requested_at: @now
+                }}
+    end
+
     test "rejects payload identity mismatches" do
       tenant_id = Ecto.UUID.generate()
       user_id = Ecto.UUID.generate()
@@ -125,6 +153,30 @@ defmodule Arbiter.Sync.OutboxReadModelDispatchTest do
                ),
                @now
              ) == {:error, :invalid_previous_policy_version}
+
+      assert OutboxReadModelDispatch.command(
+               outbox_event(
+                 tenant_id: tenant_id,
+                 aggregate_id: user_id,
+                 event_type: "rebuild_user_access_projection",
+                 payload: %{"tenant_id" => tenant_id, "user_id" => user_id}
+               ),
+               @now
+             ) == {:error, :missing_user_policy_version}
+
+      assert OutboxReadModelDispatch.command(
+               outbox_event(
+                 tenant_id: tenant_id,
+                 aggregate_id: user_id,
+                 event_type: "rebuild_user_access_projection",
+                 payload: %{
+                   "tenant_id" => tenant_id,
+                   "user_id" => user_id,
+                   "user_policy_version" => ""
+                 }
+               ),
+               @now
+             ) == {:error, :invalid_user_policy_version}
 
       assert OutboxReadModelDispatch.command(
                outbox_event(event_type: "invalidate_user_access_cache", payload: nil),

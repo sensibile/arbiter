@@ -60,7 +60,7 @@ The read model storage contract is:
 | Write-side change | Outbox command | Command status | Read model target | Lookup shape |
 | --- | --- | --- | --- | --- |
 | User membership, role, status, clearance, or policy-version change | `invalidate_user_access_cache` | Implemented MVP command | User access projection table/cache | `tenant_id`, `user_id`, `policy_version` |
-| User membership, role, status, clearance, or policy-version change | `rebuild_user_access_projection` | Planned projection command | User access projection table/cache | `tenant_id`, `user_id`, `policy_version` |
+| User membership, role, status, clearance, or policy-version change | `rebuild_user_access_projection` | Command contract implemented; executor planned | User access projection table/cache | `tenant_id`, `user_id`, `policy_version` |
 | Policy DSL, policy version, or scope-relevant tenant setting change | `rebuild_policy_scope_projection` | Planned projection command | Policy scope projection table/cache | `tenant_id`, `policy_id`, `resource_type`, `action`, `policy_version` |
 | Tool permission or tool contract change | `invalidate_tool_result_cache` | Implemented MVP command | Tool permission projection/cache | `tenant_id`, `user_id`, `tool`, `action`, `policy_version` |
 | Tool permission or tool contract change | `rebuild_tool_permission_projection` | Planned projection command | Tool permission projection/cache | `tenant_id`, `user_id`, `tool`, `action`, `policy_version` |
@@ -155,7 +155,8 @@ The MVP currently includes:
 - `Arbiter.ReadModels.AccessibleDocumentChunk` for the first retrieval read model projection table.
 - `Arbiter.ReadModels.AccessibleDocumentChunkBuilder` for pure user/chunk/decision-to-projection attribute shaping.
 - `Arbiter.ReadModels` for projection upsert, active lookup, and user-policy invalidation.
-- `Arbiter.Sync.OutboxReadModelDispatch` for mapping user-access invalidation outbox events to read model commands.
+- `Arbiter.Sync.OutboxReadModelDispatch` for mapping user-access invalidation and rebuild outbox events to read model commands.
 - `Arbiter.Sync.OutboxProcessor.run_once/2` for one bounded pass that claims pending outbox rows, dispatches supported read model commands, and marks rows processed or failed.
+- `rebuild_user_access_projection` command validation, with execution still marked unsupported until the rebuild executor is added.
 - Gateway stale snapshot checks for user and resource policy versions.
 - Gateway read model scope injection for passing accessible chunk ids to retrieval adapters without introducing a direct Repo/read-model dependency in the hot-path core.

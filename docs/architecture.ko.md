@@ -121,6 +121,7 @@
 - `Arbiter.Sync.OutboxProcessor.run_once/2`를 통해 bounded outbox processing pass를 한 번 실행합니다.
 - Persisted `id`, `attempts`, `locked_at`이 claim한 row와 여전히 일치할 때만 claimed row를 terminal 상태로 표시합니다.
 - `invalidate_user_access_cache` event를 `Arbiter.ReadModels.invalidate_user_access/4`로 dispatch해서 revoke 후 오래된 `accessible_document_chunks` row를 invalidation합니다.
+- `rebuild_user_access_projection` event를 검증된 read model command로 매핑합니다. Command contract는 구현되어 있지만 rebuild executor가 생기기 전까지 실행은 의도적으로 unsupported이며, 해당 row는 조용히 성공하지 않고 `failed`로 표시됩니다.
 
 경계 규칙:
 
@@ -137,7 +138,7 @@ Arbiter는 Event Sourcing 대신 current-state CQRS를 사용합니다.
 - Audit record는 lineage이며 replay 가능한 command state가 아닙니다.
 - Outbox row는 propagation command이며 source of truth가 아닙니다.
 - Revoke path는 비동기 projection refresh를 기다리지 않기 위해 policy version 증가와 stale-snapshot fail-close 동작을 사용합니다.
-- Outbox 처리는 `pending -> processing -> processed | failed`를 사용합니다. 현재 구현은 supervised background worker가 아니라 bounded `run_once/2` processor입니다.
+- Outbox 처리는 `pending -> processing -> processed | failed`를 사용합니다. 현재 구현은 구현된 read model operation을 위한 bounded `run_once/2` processor이며, supervised background worker는 아닙니다.
 - `accessible_document_chunks`는 retrieval filtering을 위한 첫 구현 read model table입니다. Active lookup은 tenant, user, user policy version, chunk deletion state, revoke invalidation state로 scope됩니다.
 
 ## Fail-Closed 불변식

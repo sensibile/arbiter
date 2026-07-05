@@ -62,4 +62,13 @@ defmodule Arbiter.SyncFixtures do
       "current_policy_version" => current_policy_version
     }
   end
+
+  def rebuild_user_access_payload(tenant_id, user_id, user_policy_version) do
+    %{
+      "command" => "rebuild_user_access_projection",
+      "tenant_id" => tenant_id,
+      "user_id" => user_id,
+      "user_policy_version" => user_policy_version
+    }
+  end
 end
