@@ -36,8 +36,25 @@
 경계 규칙:
 
 - Policy 모듈은 `Arbiter.Repo`, HTTP client, vector store, clock, ID generator, process messaging, audit persistence를 호출하지 않아야 합니다.
-- 이 boundary 안의 Authorizer 구현은 이미 로드된 request/user/role data를 받아 `Arbiter.Policy.Decision`을 반환합니다. Repo 기반 role store, Casbin, SaaS IAM, policy bundle loading은 이후 shell boundary가 소유합니다.
+- 이 boundary 안의 Authorizer 구현은 이미 로드된 request/user/role data를 받아 `Arbiter.Policy.Decision`을 반환합니다. `Arbiter.Policy.Authorizer.Core`는 공유되는 순수 request identity validation, ABAC scope extraction, decision shaping을 소유합니다.
 - Authorizer는 request user id, 로드된 user snapshot id, tenant scope가 일치하지 않으면 fail-close해야 합니다.
+
+### Authorizer Shell Boundary
+
+소유 모듈: `Arbiter.Authorizers.*`
+
+책임:
+
+- `Arbiter.Authorizers.RepoBacked`는 `Arbiter.Repo`에서 현재 저장된 user role과 ABAC attribute를 로드합니다.
+- `Arbiter.Authorizers.Casbin`은 주입된 `enforce` 함수를 호출하는 backend-neutral Casbin port를 제공합니다.
+- Repo 접근과 외부 policy engine 호출을 `Arbiter.Policy`와 `Arbiter.Gateway` 밖에 둡니다.
+- Repo-backed, Casbin, static authorizer가 같은 request identity와 ABAC fail-close semantics를 공유하도록 `Arbiter.Policy.Authorizer.Core`를 재사용합니다.
+
+경계 규칙:
+
+- Repo-backed authorizer는 `Arbiter.Repo`와 tenant schema를 호출할 수 있지만 authorizer contract를 통해 plain `Arbiter.Policy.Decision`을 반환해야 합니다.
+- Casbin authorizer는 enforcer의 non-boolean 응답, raise, throw를 fail-closed error로 처리해야 합니다.
+- Gateway는 여전히 authorizer를 injected function으로 받으며 어떤 authorizer shell이 사용되는지 직접 알지 않아야 합니다.
 
 ### Retrieval Core
 

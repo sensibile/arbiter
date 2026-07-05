@@ -94,6 +94,9 @@ defmodule Arbiter.MixProject do
     [
       Arbiter,
       Arbiter.Application,
+      Arbiter.Authorizers,
+      Arbiter.Authorizers.Casbin,
+      Arbiter.Authorizers.RepoBacked,
       Arbiter.Repo,
       ArbiterWeb,
       ArbiterWeb.Endpoint,

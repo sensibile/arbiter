@@ -40,6 +40,7 @@ flowchart LR
 - Document와 chunk
 - Policy와 policy decision
 - Gateway authorization injection을 위한 static RBAC/ABAC authorizer contract
+- Runtime RBAC 확장을 위한 Repo-backed authorizer shell과 Casbin port authorizer shell
 - Agent run
 - Retrieval trace
 - 최소 Policy DSL 파싱과 평가

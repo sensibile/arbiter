@@ -22,6 +22,7 @@ Declared groups:
 | `Arbiter.Adapters.Search` | `Memory` | `Arbiter.Retrieval` |
 | `Arbiter.Agents` | `AgentRun` | `Arbiter.Tenants` |
 | `Arbiter.Application` | none | `Arbiter`, `ArbiterWeb` |
+| `Arbiter.Authorizers` | `Casbin`, `RepoBacked` | `Arbiter.Policy`, `Arbiter.Repo`, `Arbiter.Tenants` |
 | `Arbiter.Audit` | `AnswerLineage` | `Arbiter.Policy`, `Arbiter.Repo`, `Arbiter.Retrieval` |
 | `Arbiter.Documents` | `Chunk`, `Document` | `Arbiter.Tenants` |
 | `Arbiter.Gateway` | `Error`, `Result`, `ToolCall` | `Arbiter.Policy`, `Arbiter.Retrieval` |
@@ -38,6 +39,7 @@ Declared groups:
 - Deep `Arbiter.Policy` and `Arbiter.Retrieval` modules cannot call `Arbiter.Repo`.
 - `Arbiter.Gateway` can depend on policy and retrieval contracts, but not Repo, read models, sync, audit, web, cache, vector, or HTTP adapters.
 - Adapter contracts and concrete adapter implementations live behind `Arbiter.Adapters`.
+- Repo-backed and external authorizer shells live behind `Arbiter.Authorizers`; `Arbiter.Policy` remains pure.
 - `Arbiter.ReadModels` owns projection storage and may use Repo, command schemas, and policy decision structs.
 - `Arbiter.Sync` owns outbox/revoke orchestration and may call read model and Repo boundaries.
 - `Arbiter.Application` is the composition root for the domain app and Phoenix web boundary.

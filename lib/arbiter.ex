@@ -5,6 +5,7 @@ defmodule Arbiter do
     exports: [
       Agents,
       Adapters,
+      Authorizers,
       Audit,
       Documents,
       Gateway,

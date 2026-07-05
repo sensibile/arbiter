@@ -36,8 +36,25 @@ Responsibilities:
 Boundary rule:
 
 - Policy modules should not call `Arbiter.Repo`, HTTP clients, vector stores, clocks, ID generators, process messaging, or audit persistence.
-- Authorizer implementations in this boundary receive already-loaded request/user/role data and return `Arbiter.Policy.Decision` values. Repo-backed role stores, Casbin, SaaS IAM, and policy bundle loading belong in later shell boundaries.
+- Authorizer implementations in this boundary receive already-loaded request/user/role data and return `Arbiter.Policy.Decision` values. `Arbiter.Policy.Authorizer.Core` owns shared pure request identity validation, ABAC scope extraction, and decision shaping.
 - Authorizers must fail closed when the request user id, loaded user snapshot id, or tenant scope do not match.
+
+### Authorizer Shell Boundary
+
+Owned by `Arbiter.Authorizers.*`.
+
+Responsibilities:
+
+- Provide `Arbiter.Authorizers.RepoBacked` for loading the current persisted user role and ABAC attributes from `Arbiter.Repo`.
+- Provide `Arbiter.Authorizers.Casbin` as a backend-neutral Casbin port that calls an injected `enforce` function.
+- Keep Repo access and external policy engine calls out of `Arbiter.Policy` and `Arbiter.Gateway`.
+- Reuse `Arbiter.Policy.Authorizer.Core` so Repo-backed, Casbin, and static authorizers share the same request identity and ABAC fail-close semantics.
+
+Boundary rule:
+
+- Repo-backed authorizers may call `Arbiter.Repo` and tenant schemas, but must return plain `Arbiter.Policy.Decision` values through the authorizer contract.
+- Casbin authorizers must treat non-boolean enforcer responses, raised errors, and thrown values as fail-closed errors.
+- Gateway still receives authorizers as injected functions and must not directly know which authorizer shell is used.
 
 ### Retrieval Core
 

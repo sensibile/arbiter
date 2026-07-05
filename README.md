@@ -40,6 +40,7 @@ The current implementation has completed the first MVP pass:
 - Documents and chunks
 - Policies and policy decisions
 - Static RBAC/ABAC authorizer contract for Gateway authorization injection
+- Repo-backed and Casbin-port authorizer shells for runtime RBAC expansion
 - Agent runs
 - Retrieval traces
 - Minimal policy DSL parsing and evaluation

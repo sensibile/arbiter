@@ -7,6 +7,7 @@ defmodule Arbiter.Policy do
       AST,
       Attributes,
       Authorizer,
+      Authorizer.Core,
       Authorizer.Static,
       Decision,
       Evaluator,
