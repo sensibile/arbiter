@@ -17,7 +17,9 @@ Declared groups:
 | Boundary | Exports | Dependencies |
 | --- | --- | --- |
 | `Arbiter` | domain boundary modules | none |
-| `Arbiter.Adapters` | `Cache` | none |
+| `Arbiter.Adapters` | `Cache`, `Search` | `Arbiter.Retrieval` |
+| `Arbiter.Adapters.Cache` | `Memory` | none |
+| `Arbiter.Adapters.Search` | `Memory` | `Arbiter.Retrieval` |
 | `Arbiter.Agents` | `AgentRun` | `Arbiter.Tenants` |
 | `Arbiter.Application` | none | `Arbiter`, `ArbiterWeb` |
 | `Arbiter.Audit` | `AnswerLineage` | `Arbiter.Policy`, `Arbiter.Repo`, `Arbiter.Retrieval` |

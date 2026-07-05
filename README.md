@@ -25,6 +25,7 @@ The current implementation has completed the first MVP pass:
 - Revoke simulation with policy version bumping, transactional outbox invalidation commands, and stale snapshot fail-close
 - Accessible chunk read model projection, rebuild execution, and optional supervised outbox processing
 - Cache adapter contract with a local in-memory implementation for scoped outbox invalidation
+- Search adapter contract with a local in-memory implementation for guarded retrieval execution
 
 See `docs/architecture.md` for the implemented module boundaries and contract summary.
 See `docs/adr/0001-state-sourced-cqrs.md` for the storage strategy.

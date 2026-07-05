@@ -158,6 +158,7 @@ MVP에는 현재 다음 구현이 포함되어 있습니다.
 - User-access invalidation 및 rebuild outbox event를 read model command로 매핑하는 `Arbiter.Sync.OutboxReadModelDispatch`
 - Tool 및 retrieval cache invalidation event를 backend-neutral cache adapter command로 매핑하는 `Arbiter.Sync.OutboxCacheDispatch`
 - 교체 가능한 adapter contract를 통해 scoped cache invalidation을 수행하는 `Arbiter.Adapters.Cache`와 `Arbiter.Adapters.Cache.Memory`
+- 교체 가능한 adapter contract를 통해 guarded retrieval execution을 수행하는 `Arbiter.Adapters.Search`와 `Arbiter.Adapters.Search.Memory`
 - Pending outbox row를 claim하고 지원되는 read model command를 dispatch한 뒤 row를 processed 또는 failed로 표시하는 bounded pass인 `Arbiter.Sync.OutboxProcessor.run_once/2`
 - Bounded outbox processing pass를 선택적으로 supervised scheduling하는 `Arbiter.Sync.OutboxWorker`
 - Worker-visible claim provenance와 terminal update 검사를 위한 선택적 `locked_by` outbox ownership

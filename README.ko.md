@@ -25,6 +25,7 @@ Arbiter는 AI agent가 현재 사용자가 접근할 수 있는 데이터만 검
 - Policy version 증가, transactional outbox invalidation command, stale snapshot fail-close를 포함한 revoke simulation
 - 접근 가능한 chunk read model projection, rebuild 실행, 선택적 supervised outbox processing
 - Scoped outbox invalidation을 위한 cache adapter contract와 local in-memory 구현
+- Guarded retrieval execution을 위한 search adapter contract와 local in-memory 구현
 
 구현된 모듈 경계와 계약 요약은 `docs/architecture.ko.md`를 참고하세요.
 저장소 전략은 `docs/adr/0001-state-sourced-cqrs.ko.md`를 참고하세요.

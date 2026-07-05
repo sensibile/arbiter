@@ -113,10 +113,13 @@ Responsibilities:
 - Define adapter contracts for external or replaceable infrastructure.
 - Provide `Arbiter.Adapters.Cache` as the cache invalidation behaviour.
 - Provide `Arbiter.Adapters.Cache.Memory` for tests and local development.
+- Provide `Arbiter.Adapters.Search` as the guarded retrieval search behaviour.
+- Provide `Arbiter.Adapters.Search.Memory` for tests and local development.
 
 Boundary rule:
 
 - Adapter contracts should be backend-neutral and receive validated commands from orchestration boundaries.
+- Search adapters must receive `Arbiter.Retrieval.GuardedQuery` values, not raw caller query maps, and must apply `allowed_chunk_ids` before returning chunks.
 - Concrete cache, vector/search, SaaS, or HTTP clients should live behind this boundary or a narrower documented adapter boundary.
 
 ### Sync/Revoke and Outbox Consumer Boundary

@@ -17,7 +17,9 @@ mix boundary.spec
 | Boundary | Export | Dependency |
 | --- | --- | --- |
 | `Arbiter` | domain boundary module | 없음 |
-| `Arbiter.Adapters` | `Cache` | 없음 |
+| `Arbiter.Adapters` | `Cache`, `Search` | `Arbiter.Retrieval` |
+| `Arbiter.Adapters.Cache` | `Memory` | 없음 |
+| `Arbiter.Adapters.Search` | `Memory` | `Arbiter.Retrieval` |
 | `Arbiter.Agents` | `AgentRun` | `Arbiter.Tenants` |
 | `Arbiter.Application` | 없음 | `Arbiter`, `ArbiterWeb` |
 | `Arbiter.Audit` | `AnswerLineage` | `Arbiter.Policy`, `Arbiter.Repo`, `Arbiter.Retrieval` |

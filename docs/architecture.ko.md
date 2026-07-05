@@ -113,10 +113,13 @@
 - 외부 또는 교체 가능한 infrastructure를 위한 adapter contract를 정의합니다.
 - Cache invalidation behaviour인 `Arbiter.Adapters.Cache`를 제공합니다.
 - 테스트와 로컬 개발용 `Arbiter.Adapters.Cache.Memory`를 제공합니다.
+- Guarded retrieval search behaviour인 `Arbiter.Adapters.Search`를 제공합니다.
+- 테스트와 로컬 개발용 `Arbiter.Adapters.Search.Memory`를 제공합니다.
 
 경계 규칙:
 
 - Adapter contract는 backend-neutral해야 하며 orchestration boundary가 검증한 command를 받아야 합니다.
+- Search adapter는 raw caller query map이 아니라 `Arbiter.Retrieval.GuardedQuery`를 받아야 하며, chunk를 반환하기 전에 `allowed_chunk_ids`를 적용해야 합니다.
 - Concrete cache, vector/search, SaaS, HTTP client는 이 boundary 또는 문서화된 더 좁은 adapter boundary 뒤에 둡니다.
 
 ### Sync/Revoke와 Outbox Consumer Boundary
