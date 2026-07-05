@@ -4,6 +4,7 @@ defmodule Arbiter.Sync.OutboxProcessorTest do
   alias Arbiter.ReadModels
   alias Arbiter.ReadModels.AccessibleDocumentChunk
   alias Arbiter.Repo
+  alias Arbiter.Adapters.Cache.Memory
   alias Arbiter.Sync.OutboxEvent
   alias Arbiter.Sync.OutboxProcessor
 
@@ -138,15 +139,24 @@ defmodule Arbiter.Sync.OutboxProcessorTest do
       assert Repo.get!(OutboxEvent, second.id).status == OutboxEvent.status_pending()
     end
 
-    test "marks unsupported read model events failed without aborting the pass" do
+    test "processes cache events through the configured cache adapter without aborting the pass" do
       tenant = tenant_fixture("outbox-processor-tenant")
+      cache = start_supervised!({Memory, []})
       user_id = Ecto.UUID.generate()
 
-      unsupported =
+      assert :ok =
+               Memory.put(cache, "tool:cached", :value,
+                 cache: :tool_result,
+                 tenant_id: tenant.id,
+                 user_id: user_id,
+                 previous_policy_version: "policy_v3"
+               )
+
+      cache_event =
         outbox_event_fixture(tenant,
           event_type: "invalidate_tool_result_cache",
           aggregate_id: user_id,
-          payload: %{"cache_key" => "tool-result"}
+          payload: invalidate_user_access_payload(tenant.id, user_id, "policy_v3", "policy_v4")
         )
 
       supported =
@@ -158,20 +168,21 @@ defmodule Arbiter.Sync.OutboxProcessorTest do
       assert {:ok,
               %{
                 claimed: 2,
-                processed: 1,
-                failed: 1,
+                processed: 2,
+                failed: 0,
                 errors: 0,
                 results: results
-              }} = OutboxProcessor.run_once(10, now: @now)
+              }} =
+               OutboxProcessor.run_once(10, now: @now, cache_adapter: {Memory, cache})
 
-      assert {:failed, failed_event} =
+      assert {:processed, processed_cache_event} =
                Enum.find(results, fn
-                 {:failed, event} -> event.id == unsupported.id
+                 {:processed, event} -> event.id == cache_event.id
                  _result -> false
                end)
 
-      assert failed_event.status == OutboxEvent.status_failed()
-      assert failed_event.last_error == "unsupported_read_model_command"
+      assert processed_cache_event.status == OutboxEvent.status_processed()
+      assert Memory.get(cache, "tool:cached") == :miss
       assert Repo.get!(OutboxEvent, supported.id).status == OutboxEvent.status_processed()
     end
 

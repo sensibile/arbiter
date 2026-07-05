@@ -104,6 +104,21 @@
 - Policy, retrieval guard, gateway 모듈은 이 boundary를 직접 호출하기보다 injected function 또는 orchestration layer를 통해 read model 결과를 사용해야 합니다.
 - `accessible_document_chunks`는 파생 저장소입니다. Command store가 authoritative source이며 stale, missing, deleted, invalidated projection row가 access grant가 되어서는 안 됩니다.
 
+### Adapter Boundary
+
+소유 모듈: `Arbiter.Adapters.*`
+
+책임:
+
+- 외부 또는 교체 가능한 infrastructure를 위한 adapter contract를 정의합니다.
+- Cache invalidation behaviour인 `Arbiter.Adapters.Cache`를 제공합니다.
+- 테스트와 로컬 개발용 `Arbiter.Adapters.Cache.Memory`를 제공합니다.
+
+경계 규칙:
+
+- Adapter contract는 backend-neutral해야 하며 orchestration boundary가 검증한 command를 받아야 합니다.
+- Concrete cache, vector/search, SaaS, HTTP client는 이 boundary 또는 문서화된 더 좁은 adapter boundary 뒤에 둡니다.
+
 ### Sync/Revoke와 Outbox Consumer Boundary
 
 소유 모듈: `Arbiter.Sync.RevokeSimulation`, `Arbiter.Sync.Outbox`, `Arbiter.Sync.OutboxEvent`, `Arbiter.Sync.OutboxConsumerCommand`, `Arbiter.Sync.OutboxReadModelDispatch`, `Arbiter.Sync.OutboxConsumer`, `Arbiter.Sync.OutboxProcessor`, `Arbiter.Sync.OutboxWorker`
@@ -124,6 +139,7 @@
 - Persisted `id`, `attempts`, `locked_at`, 선택적 `locked_by`가 claim한 row와 여전히 일치할 때만 claimed row를 terminal 상태로 표시합니다.
 - `invalidate_user_access_cache` event를 `Arbiter.ReadModels.invalidate_user_access/4`로 dispatch해서 revoke 후 오래된 `accessible_document_chunks` row를 invalidation합니다.
 - `rebuild_user_access_projection` event를 `Arbiter.ReadModels.rebuild_user_access_projection/4`로 dispatch합니다. 이 함수는 tenant/user/policy version에 해당하는 기존 row를 invalidation한 뒤 현재 user와 chunk 상태에서 active projection을 다시 만듭니다.
+- `invalidate_tool_result_cache`와 `invalidate_retrieval_result_cache` event를 검증된 tenant/user/policy-version scope로 configured cache adapter에 dispatch합니다.
 - 요청한 user source가 없거나 policy version이 stale이거나 scope가 잘못된 경우 read model rebuild를 fail-closed 처리합니다.
 
 경계 규칙:
@@ -131,7 +147,8 @@
 - 이 boundary는 propagation command를 outbox row로 저장하고 outbox status persistence를 소유합니다. 실제 cache/process, vector, search adapter는 policy와 retrieval core 바깥에 두어야 합니다.
 - `Arbiter.Sync.OutboxConsumerCommand`는 Repo, clock, process, cache adapter, vector/search adapter를 호출하지 않아야 합니다. 호출자가 timestamp를 데이터로 전달합니다.
 - `Arbiter.Sync.OutboxReadModelDispatch`는 순수 모듈로 유지해야 합니다. Event payload를 검증하고 read model command를 반환하지만 `Arbiter.Repo` 또는 `Arbiter.ReadModels`를 호출하지 않습니다.
-- `Arbiter.Sync.OutboxWorker`는 read model command 세부사항을 알지 않아야 합니다. 설정된 limit, interval, 선택적 worker ownership으로 `Arbiter.Sync.OutboxProcessor.run_once/2`만 schedule합니다.
+- `Arbiter.Sync.OutboxCacheDispatch`는 순수 모듈로 유지해야 합니다. Event payload를 검증하고 cache adapter command를 반환하지만 adapter를 호출하지 않습니다.
+- `Arbiter.Sync.OutboxWorker`는 read model 또는 cache command 세부사항을 알지 않아야 합니다. 설정된 limit, interval, 선택적 worker ownership으로 `Arbiter.Sync.OutboxProcessor.run_once/2`만 schedule합니다.
 - Outbox telemetry에는 tenant, user, aggregate, payload, row identifier를 포함하지 않아야 합니다. Pass status, limit, duration, aggregate count만 노출합니다.
 
 ### 저장소 전략

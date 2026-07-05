@@ -9,8 +9,10 @@ defmodule Arbiter.Sync.OutboxConsumer do
 
   import Ecto.Query
 
+  alias Arbiter.Adapters.Cache
   alias Arbiter.Repo
   alias Arbiter.ReadModels
+  alias Arbiter.Sync.OutboxCacheDispatch
   alias Arbiter.Sync.OutboxConsumerCommand
   alias Arbiter.Sync.OutboxEvent
   alias Arbiter.Sync.OutboxReadModelDispatch
@@ -53,8 +55,8 @@ defmodule Arbiter.Sync.OutboxConsumer do
     now = Keyword.get_lazy(opts, :now, &default_now/0)
 
     event
-    |> OutboxReadModelDispatch.command(now)
-    |> execute_read_model_command()
+    |> dispatch_command(now)
+    |> execute_command(opts)
     |> mark_processed_or_failed(event, now)
   end
 
@@ -89,7 +91,14 @@ defmodule Arbiter.Sync.OutboxConsumer do
   defp where_locked_by(query, nil), do: where(query, [row], is_nil(row.locked_by))
   defp where_locked_by(query, locked_by), do: where(query, [row], row.locked_by == ^locked_by)
 
-  defp execute_read_model_command({:ok, %{operation: :invalidate_user_access} = command}) do
+  defp dispatch_command(event, now) do
+    case OutboxReadModelDispatch.command(event, now) do
+      {:error, :unsupported_read_model_command} -> OutboxCacheDispatch.command(event)
+      result -> result
+    end
+  end
+
+  defp execute_command({:ok, %{operation: :invalidate_user_access} = command}, _opts) do
     ReadModels.invalidate_user_access(
       command.tenant_id,
       command.user_id,
@@ -98,7 +107,7 @@ defmodule Arbiter.Sync.OutboxConsumer do
     )
   end
 
-  defp execute_read_model_command({:ok, %{operation: :rebuild_user_access_projection} = command}) do
+  defp execute_command({:ok, %{operation: :rebuild_user_access_projection} = command}, _opts) do
     ReadModels.rebuild_user_access_projection(
       command.tenant_id,
       command.user_id,
@@ -107,7 +116,23 @@ defmodule Arbiter.Sync.OutboxConsumer do
     )
   end
 
-  defp execute_read_model_command({:error, reason}), do: {:error, reason}
+  defp execute_command({:ok, %{operation: :invalidate_cache} = command}, opts) do
+    case Keyword.get(opts, :cache_adapter) do
+      {_adapter, _target} = adapter ->
+        case Cache.invalidate(adapter, command) do
+          :ok -> {:ok, command}
+          {:error, reason} -> {:error, reason}
+        end
+
+      nil ->
+        {:error, :cache_adapter_unavailable}
+
+      _invalid ->
+        {:error, :invalid_cache_adapter}
+    end
+  end
+
+  defp execute_command({:error, reason}, _opts), do: {:error, reason}
 
   defp mark_processed_or_failed({:ok, _result}, event, now), do: mark_processed(event, now: now)
 

@@ -104,6 +104,21 @@ Boundary rule:
 - Policy, retrieval guard, and gateway modules should consume read model results through injected functions or orchestration layers rather than calling this boundary directly.
 - `accessible_document_chunks` is derived storage. The command store remains authoritative, and stale, missing, deleted, or invalidated projection rows must not grant access.
 
+### Adapter Boundary
+
+Owned by `Arbiter.Adapters.*`.
+
+Responsibilities:
+
+- Define adapter contracts for external or replaceable infrastructure.
+- Provide `Arbiter.Adapters.Cache` as the cache invalidation behaviour.
+- Provide `Arbiter.Adapters.Cache.Memory` for tests and local development.
+
+Boundary rule:
+
+- Adapter contracts should be backend-neutral and receive validated commands from orchestration boundaries.
+- Concrete cache, vector/search, SaaS, or HTTP clients should live behind this boundary or a narrower documented adapter boundary.
+
 ### Sync/Revoke and Outbox Consumer Boundary
 
 Owned by `Arbiter.Sync.RevokeSimulation`, `Arbiter.Sync.Outbox`, `Arbiter.Sync.OutboxEvent`, `Arbiter.Sync.OutboxConsumerCommand`, `Arbiter.Sync.OutboxReadModelDispatch`, `Arbiter.Sync.OutboxConsumer`, `Arbiter.Sync.OutboxProcessor`, and `Arbiter.Sync.OutboxWorker`.
@@ -124,6 +139,7 @@ Responsibilities:
 - Mark claimed rows as terminal only when the persisted `id`, `attempts`, `locked_at`, and optional `locked_by` still match the claimed row.
 - Dispatch `invalidate_user_access_cache` events to `Arbiter.ReadModels.invalidate_user_access/4` so old `accessible_document_chunks` rows are invalidated after revoke.
 - Dispatch `rebuild_user_access_projection` events to `Arbiter.ReadModels.rebuild_user_access_projection/4`, which invalidates old rows for the tenant/user/policy version and rebuilds active projections from current user and chunk state.
+- Dispatch `invalidate_tool_result_cache` and `invalidate_retrieval_result_cache` events through configured cache adapters using validated tenant/user/policy-version scope.
 - Fail read model rebuilds closed when the requested user source is missing, policy-version stale, or scope malformed.
 
 Boundary rule:
@@ -131,7 +147,8 @@ Boundary rule:
 - This boundary persists propagation commands as outbox rows and owns outbox status persistence. Real cache/process, vector, and search adapters should remain outside the policy and retrieval core.
 - `Arbiter.Sync.OutboxConsumerCommand` must not call Repo, clocks, processes, cache adapters, or vector/search adapters. Callers pass timestamps in as data.
 - `Arbiter.Sync.OutboxReadModelDispatch` must stay pure. It validates event payloads and returns read model commands, but does not call `Arbiter.Repo` or `Arbiter.ReadModels`.
-- `Arbiter.Sync.OutboxWorker` must not know read model command details. It schedules `Arbiter.Sync.OutboxProcessor.run_once/2` with configured limits, intervals, and optional worker ownership.
+- `Arbiter.Sync.OutboxCacheDispatch` must stay pure. It validates event payloads and returns cache adapter commands, but does not call adapters.
+- `Arbiter.Sync.OutboxWorker` must not know read model or cache command details. It schedules `Arbiter.Sync.OutboxProcessor.run_once/2` with configured limits, intervals, and optional worker ownership.
 - Outbox telemetry must not include tenant, user, aggregate, payload, or row identifiers; expose only pass status, limit, duration, and aggregate counts.
 
 ### Storage Strategy

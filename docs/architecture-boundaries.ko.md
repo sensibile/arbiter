@@ -17,6 +17,7 @@ mix boundary.spec
 | Boundary | Export | Dependency |
 | --- | --- | --- |
 | `Arbiter` | domain boundary module | 없음 |
+| `Arbiter.Adapters` | `Cache` | 없음 |
 | `Arbiter.Agents` | `AgentRun` | `Arbiter.Tenants` |
 | `Arbiter.Application` | 없음 | `Arbiter`, `ArbiterWeb` |
 | `Arbiter.Audit` | `AnswerLineage` | `Arbiter.Policy`, `Arbiter.Repo`, `Arbiter.Retrieval` |
@@ -26,7 +27,7 @@ mix boundary.spec
 | `Arbiter.ReadModels` | `AccessibleDocumentChunk`, `AccessibleDocumentChunkBuilder` | `Arbiter.Documents`, `Arbiter.Policy`, `Arbiter.Repo`, `Arbiter.Tenants` |
 | `Arbiter.Repo` | 없음 | 없음 |
 | `Arbiter.Retrieval` | retrieval guard struct와 module | `Arbiter.Policy` |
-| `Arbiter.Sync` | outbox, revoke, processor, worker module | `Arbiter.Policy`, `Arbiter.ReadModels`, `Arbiter.Repo`, `Arbiter.Tenants` |
+| `Arbiter.Sync` | outbox, revoke, processor, worker module | `Arbiter.Adapters`, `Arbiter.Policy`, `Arbiter.ReadModels`, `Arbiter.Repo`, `Arbiter.Tenants` |
 | `Arbiter.Tenants` | tenant schema | 없음 |
 | `ArbiterWeb` | Phoenix web module | 없음 |
 
@@ -34,6 +35,7 @@ mix boundary.spec
 
 - 깊은 `Arbiter.Policy`와 `Arbiter.Retrieval` module은 `Arbiter.Repo`를 호출할 수 없습니다.
 - `Arbiter.Gateway`는 policy와 retrieval contract에 의존할 수 있지만 Repo, read model, sync, audit, web, cache, vector, HTTP adapter에 의존할 수 없습니다.
+- Adapter contract와 concrete adapter implementation은 `Arbiter.Adapters` 뒤에 둡니다.
 - `Arbiter.ReadModels`는 projection storage를 소유하며 Repo, command schema, policy decision struct를 사용할 수 있습니다.
 - `Arbiter.Sync`는 outbox/revoke orchestration을 소유하며 read model과 Repo boundary를 호출할 수 있습니다.
 - `Arbiter.Application`은 domain app과 Phoenix web boundary의 composition root입니다.

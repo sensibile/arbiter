@@ -2,9 +2,10 @@ defmodule Arbiter.Sync do
   @moduledoc false
 
   use Boundary,
-    deps: [Arbiter.Policy, Arbiter.ReadModels, Arbiter.Repo, Arbiter.Tenants],
+    deps: [Arbiter.Adapters, Arbiter.Policy, Arbiter.ReadModels, Arbiter.Repo, Arbiter.Tenants],
     exports: [
       Outbox,
+      OutboxCacheDispatch,
       OutboxConsumer,
       OutboxConsumerCommand,
       OutboxEvent,

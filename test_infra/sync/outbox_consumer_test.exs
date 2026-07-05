@@ -4,6 +4,7 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
   alias Arbiter.ReadModels
   alias Arbiter.ReadModels.AccessibleDocumentChunk
   alias Arbiter.Repo
+  alias Arbiter.Adapters.Cache.Memory
   alias Arbiter.Sync.OutboxConsumer
   alias Arbiter.Sync.OutboxEvent
 
@@ -180,17 +181,54 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
              }) == []
     end
 
-    test "marks unsupported read model events failed" do
+    test "invalidates cache events through the configured cache adapter" do
       tenant = tenant_fixture("outbox-consumer-tenant")
+      cache = start_supervised!({Memory, []})
+      user_id = Ecto.UUID.generate()
+
+      assert :ok =
+               Memory.put(cache, "tool:cached", :value,
+                 cache: :tool_result,
+                 tenant_id: tenant.id,
+                 user_id: user_id,
+                 previous_policy_version: "policy_v12"
+               )
 
       event =
         tenant
-        |> outbox_event_fixture(event_type: "invalidate_tool_result_cache")
+        |> outbox_event_fixture(
+          event_type: "invalidate_tool_result_cache",
+          aggregate_id: user_id,
+          payload: invalidate_user_access_payload(tenant.id, user_id, "policy_v12", "policy_v13")
+        )
+        |> claim!()
+
+      assert {:ok, processed_event} =
+               OutboxConsumer.process_read_model_event(event,
+                 now: @now,
+                 cache_adapter: {Memory, cache}
+               )
+
+      assert processed_event.status == "processed"
+      assert Memory.get(cache, "tool:cached") == :miss
+    end
+
+    test "marks cache events failed when no cache adapter is configured" do
+      tenant = tenant_fixture("outbox-consumer-tenant")
+      user_id = Ecto.UUID.generate()
+
+      event =
+        tenant
+        |> outbox_event_fixture(
+          event_type: "invalidate_tool_result_cache",
+          aggregate_id: user_id,
+          payload: invalidate_user_access_payload(tenant.id, user_id, "policy_v12", "policy_v13")
+        )
         |> claim!()
 
       assert {:error, failed_event} = OutboxConsumer.process_read_model_event(event, now: @now)
       assert failed_event.status == "failed"
-      assert failed_event.last_error == "unsupported_read_model_command"
+      assert failed_event.last_error == "cache_adapter_unavailable"
     end
 
     test "rebuilds user access projections and marks rebuild events processed" do

@@ -4,6 +4,7 @@ defmodule Arbiter do
     deps: [],
     exports: [
       Agents,
+      Adapters,
       Audit,
       Documents,
       Gateway,
