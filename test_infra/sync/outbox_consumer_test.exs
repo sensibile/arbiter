@@ -231,6 +231,29 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
       assert failed_event.last_error == "cache_adapter_unavailable"
     end
 
+    test "marks cache events failed when cache adapter shape is invalid" do
+      tenant = tenant_fixture("outbox-consumer-tenant")
+      user_id = Ecto.UUID.generate()
+
+      event =
+        tenant
+        |> outbox_event_fixture(
+          event_type: "invalidate_tool_result_cache",
+          aggregate_id: user_id,
+          payload: invalidate_user_access_payload(tenant.id, user_id, "policy_v12", "policy_v13")
+        )
+        |> claim!()
+
+      assert {:error, failed_event} =
+               OutboxConsumer.process_event(event,
+                 now: @now,
+                 cache_adapter: :not_an_adapter
+               )
+
+      assert failed_event.status == "failed"
+      assert failed_event.last_error == "invalid_cache_adapter"
+    end
+
     test "rebuilds user access projections and marks rebuild events processed" do
       %{tenant: tenant, user: user, chunk: chunk} =
         read_model_fixture_scope(prefix: "outbox-consumer-rebuild", policy_version: "policy_v13")

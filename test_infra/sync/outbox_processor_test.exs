@@ -186,6 +186,42 @@ defmodule Arbiter.Sync.OutboxProcessorTest do
       assert Repo.get!(OutboxEvent, supported.id).status == OutboxEvent.status_processed()
     end
 
+    test "counts failed events without aborting the processing pass" do
+      tenant = tenant_fixture("outbox-processor-tenant")
+      user_id = Ecto.UUID.generate()
+
+      failed =
+        outbox_event_fixture(tenant,
+          event_type: "invalidate_tool_result_cache",
+          aggregate_id: user_id,
+          payload: invalidate_user_access_payload(tenant.id, user_id, "policy_v3", "policy_v4")
+        )
+
+      processed =
+        outbox_event_fixture(tenant,
+          aggregate_id: user_id,
+          payload: invalidate_user_access_payload(tenant.id, user_id, "policy_v3", "policy_v4")
+        )
+
+      assert {:ok,
+              %{
+                claimed: 2,
+                processed: 1,
+                failed: 1,
+                errors: 0,
+                results: results
+              }} = OutboxProcessor.run_once(10, now: @now)
+
+      assert {:failed, failed_event} =
+               Enum.find(results, fn
+                 {:failed, event} -> event.id == failed.id
+                 _result -> false
+               end)
+
+      assert failed_event.last_error == "cache_adapter_unavailable"
+      assert Repo.get!(OutboxEvent, processed.id).status == OutboxEvent.status_processed()
+    end
+
     test "rejects invalid limits before claiming rows" do
       assert OutboxProcessor.run_once(0, now: @now) == {:error, :invalid_limit}
       assert OutboxProcessor.run_once("1", now: @now) == {:error, :invalid_limit}
