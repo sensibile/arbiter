@@ -60,6 +60,73 @@ defmodule Arbiter.Policy.EvaluatorTest do
            }
   end
 
+  test "enforces the policy allow-line intent when request intent is provided", %{
+    ast: ast,
+    user: user,
+    chunk: chunk
+  } do
+    context = %{user: user, chunk: chunk, subject: "user", action: "retrieve", resource: "chunk"}
+
+    assert %{decision: :allow} =
+             Evaluator.evaluate(ast, context, policy_version: "policy_v12")
+
+    decision =
+      Evaluator.evaluate(
+        ast,
+        %{context | action: "delete"},
+        policy_version: "policy_v12"
+      )
+
+    assert decision.decision == :deny
+    assert decision.reason == ["policy_intent_mismatch"]
+    assert decision.policy_version == "policy_v12"
+    assert decision.scope == %{}
+  end
+
+  test "fails closed when request intent is partial or malformed", %{
+    ast: ast,
+    user: user,
+    chunk: chunk
+  } do
+    decision =
+      Evaluator.evaluate(
+        ast,
+        %{user: user, chunk: chunk, action: "retrieve", resource: "chunk"},
+        policy_version: "policy_v12"
+      )
+
+    assert decision.decision == :deny
+    assert decision.reason == ["policy_intent_missing"]
+
+    decision =
+      Evaluator.evaluate(
+        ast,
+        %{user: user, chunk: chunk, subject: "user", action: "", resource: "chunk"},
+        policy_version: "policy_v12"
+      )
+
+    assert decision.decision == :deny
+    assert decision.reason == ["policy_intent_missing"]
+  end
+
+  test "accepts request intent through evaluator options", %{ast: ast, user: user, chunk: chunk} do
+    context = %{user: user, chunk: chunk}
+
+    assert %{decision: :allow} =
+             Evaluator.evaluate(ast, context,
+               subject: "user",
+               action: "retrieve",
+               resource: "chunk"
+             )
+
+    assert %{decision: :deny, reason: ["policy_intent_mismatch"]} =
+             Evaluator.evaluate(ast, context,
+               subject: "user",
+               action: "delete",
+               resource: "chunk"
+             )
+  end
+
   test "denies when a condition fails", %{ast: ast, user: user, chunk: chunk} do
     denied_chunk = %{chunk | sensitivity_level: 5}
 

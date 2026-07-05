@@ -12,23 +12,27 @@ defmodule Arbiter.Policy.Evaluator do
   def evaluate(%AST{effect: :allow} = ast, context, opts) when is_map(context) do
     policy_version = Keyword.get(opts, :policy_version, "unknown")
 
-    ast.conditions
-    |> Enum.reduce_while([], fn condition, reasons ->
-      case condition_satisfied?(condition, context) do
-        {:ok, true} -> {:cont, [condition.reason | reasons]}
-        {:ok, false} -> {:halt, {:deny, ["#{condition.reason}_failed"]}}
-        {:error, _reason} -> {:halt, {:deny, ["evaluation_error"]}}
-      end
-    end)
-    |> case do
-      {:deny, reasons} ->
-        deny(reasons, policy_version)
-
-      reasons ->
-        case build_scope(context) do
-          {:ok, scope} -> allow(Enum.reverse(reasons), policy_version, scope)
-          {:error, _reason} -> deny(["scope_compile_failed"], policy_version)
+    with :ok <- validate_intent(ast, context, opts) do
+      ast.conditions
+      |> Enum.reduce_while([], fn condition, reasons ->
+        case condition_satisfied?(condition, context) do
+          {:ok, true} -> {:cont, [condition.reason | reasons]}
+          {:ok, false} -> {:halt, {:deny, ["#{condition.reason}_failed"]}}
+          {:error, _reason} -> {:halt, {:deny, ["evaluation_error"]}}
         end
+      end)
+      |> case do
+        {:deny, reasons} ->
+          deny(reasons, policy_version)
+
+        reasons ->
+          case build_scope(context) do
+            {:ok, scope} -> allow(Enum.reverse(reasons), policy_version, scope)
+            {:error, _reason} -> deny(["scope_compile_failed"], policy_version)
+          end
+      end
+    else
+      {:deny, reasons} -> deny(reasons, policy_version)
     end
   end
 
@@ -37,6 +41,35 @@ defmodule Arbiter.Policy.Evaluator do
     |> Keyword.get(:policy_version, "unknown")
     |> then(&deny(["evaluation_error"], &1))
   end
+
+  defp validate_intent(%AST{} = ast, context, opts) do
+    intent = %{
+      subject: intent_value(:subject, context, opts),
+      action: intent_value(:action, context, opts),
+      resource: intent_value(:resource, context, opts)
+    }
+
+    cond do
+      Enum.all?(Map.values(intent), &is_nil/1) ->
+        :ok
+
+      not Enum.all?(Map.values(intent), &valid_intent_value?/1) ->
+        {:deny, ["policy_intent_missing"]}
+
+      intent.subject == ast.subject and intent.action == ast.action and
+          intent.resource == ast.resource ->
+        :ok
+
+      true ->
+        {:deny, ["policy_intent_mismatch"]}
+    end
+  end
+
+  defp intent_value(key, context, opts) do
+    Keyword.get(opts, key) || Map.get(context, key) || Map.get(context, Atom.to_string(key))
+  end
+
+  defp valid_intent_value?(value), do: is_binary(value) and value != ""
 
   defp condition_satisfied?(%{left: left, operator: operator, right: right}, context) do
     with {:ok, left_value} <- resolve(left, context),

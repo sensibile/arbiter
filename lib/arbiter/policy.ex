@@ -10,6 +10,7 @@ defmodule Arbiter.Policy do
       Authorizer.Core,
       Authorizer.Static,
       Decision,
+      Engine,
       Evaluator,
       ParseError,
       Parser,

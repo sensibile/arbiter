@@ -44,6 +44,7 @@ The current implementation has completed the first MVP pass:
 - Agent runs
 - Retrieval traces
 - Minimal policy DSL parsing and evaluation
+- Policy engine facade for DSL/AST evaluation with allow-line intent checks
 - Scope compilation to SQL predicates and vector metadata filters
 - Retrieval guard with pre-search filter injection and post-search validation
 - Gateway orchestration for policy-aware tool calls

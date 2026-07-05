@@ -27,7 +27,8 @@ Owned by `Arbiter.Policy.*`.
 Responsibilities:
 
 - Parse minimal policy DSL into AST.
-- Evaluate allow/deny decisions.
+- Evaluate allow/deny decisions through `Arbiter.Policy.Engine`, which accepts DSL or parsed AST values.
+- Enforce request subject/action/resource intent against the policy `allow` line when intent is provided.
 - Authorize Gateway tool calls through a pure authorizer contract that separates RBAC allow/deny from ABAC retrieval scope construction.
 - Build decision reasons and policy scopes.
 - Compile scopes into SQL predicates and vector metadata filters.
@@ -36,6 +37,7 @@ Responsibilities:
 Boundary rule:
 
 - Policy modules should not call `Arbiter.Repo`, HTTP clients, vector stores, clocks, ID generators, process messaging, or audit persistence.
+- `Arbiter.Policy.Engine` is a pure facade over parsing and evaluation. It does not load policy bundles or execute external authorizers.
 - Authorizer implementations in this boundary receive already-loaded request/user/role data and return `Arbiter.Policy.Decision` values. `Arbiter.Policy.Authorizer.Core` owns shared pure request identity validation, ABAC scope extraction, and decision shaping.
 - Authorizers must fail closed when the request user id, loaded user snapshot id, or tenant scope do not match.
 

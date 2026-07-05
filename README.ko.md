@@ -44,6 +44,7 @@ flowchart LR
 - Agent run
 - Retrieval trace
 - 최소 Policy DSL 파싱과 평가
+- Allow-line intent check를 포함한 DSL/AST 평가용 policy engine facade
 - SQL predicate와 vector metadata filter로의 scope compilation
 - 검색 전 filter 주입과 검색 후 검증을 수행하는 retrieval guard
 - 정책 인식 tool call을 위한 gateway orchestration
