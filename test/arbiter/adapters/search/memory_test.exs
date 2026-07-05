@@ -53,6 +53,22 @@ defmodule Arbiter.Adapters.Search.MemoryTest do
     assert Enum.map(chunks, & &1.id) == ["chunk_2", "chunk_3"]
   end
 
+  test "does not return malformed chunks through allowlist filtering" do
+    search =
+      start_supervised!(
+        {Memory,
+         chunks: [
+           chunk("chunk_1", department_id: "finance"),
+           Map.delete(chunk("chunk_2", department_id: "finance"), :id)
+         ]}
+      )
+
+    query = guarded_query(allowed_chunk_ids: ["chunk_1", "chunk_2"])
+
+    assert {:ok, chunks} = Search.search({Memory, search}, query)
+    assert Enum.map(chunks, & &1.id) == ["chunk_1"]
+  end
+
   test "supports putting chunks after start and atom-keyed local fixtures" do
     search = start_supervised!({Memory, []})
 
@@ -85,6 +101,58 @@ defmodule Arbiter.Adapters.Search.MemoryTest do
     query = %{guarded_query() | applied_filter: %{"tenant_id" => %{"$unknown" => ["tenant_a"]}}}
 
     assert Search.search({Memory, search}, query) == {:error, :unsupported_search_filter}
+  end
+
+  test "handles malformed chunk metadata and missing top k without widening results" do
+    search =
+      start_supervised!(
+        {Memory,
+         chunks: [
+           chunk("chunk_1", department_id: "finance", sensitivity_level: 2),
+           chunk("chunk_2", department_id: "finance", sensitivity_level: "high"),
+           chunk("chunk_3", department_id: "legal", sensitivity_level: 1)
+         ]}
+      )
+
+    query = %{guarded_query() | query: %{"text" => "renewal risk"}}
+
+    assert {:ok, chunks} = Search.search({Memory, search}, query)
+    assert Enum.map(chunks, & &1.id) == ["chunk_1", "chunk_3"]
+
+    query = %{guarded_query() | query: nil}
+
+    assert {:ok, chunks} = Search.search({Memory, search}, query)
+    assert Enum.map(chunks, & &1.id) == ["chunk_1", "chunk_3"]
+  end
+
+  test "supports policy version, atom-keyed, and custom metadata filters" do
+    search =
+      start_supervised!(
+        {Memory,
+         chunks: [
+           chunk("chunk_1", department_id: "finance", policy_version: "policy_v12")
+           |> Map.put("source", "contracts"),
+           chunk("chunk_2", department_id: "legal", policy_version: "policy_v12")
+           |> Map.put("source", "contracts"),
+           chunk("chunk_3", department_id: "finance", policy_version: "policy_v11")
+           |> Map.put("source", "contracts"),
+           chunk("chunk_4", department_id: "finance", policy_version: "policy_v12")
+           |> Map.put("source", "tickets")
+         ]}
+      )
+
+    query = %{
+      guarded_query()
+      | applied_filter: %{
+          :tenant_id => "tenant_a",
+          "department_id" => "finance",
+          "policy_version" => "policy_v12",
+          "source" => "contracts"
+        }
+    }
+
+    assert {:ok, chunks} = Search.search({Memory, search}, query)
+    assert Enum.map(chunks, & &1.id) == ["chunk_1"]
   end
 
   test "builds a Gateway-compatible executor function" do

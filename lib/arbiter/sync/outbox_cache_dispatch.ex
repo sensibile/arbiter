@@ -53,6 +53,4 @@ defmodule Arbiter.Sync.OutboxCacheDispatch do
         command
     end
   end
-
-  defp optional_cache_key(%OutboxEvent{}, command), do: command
 end
