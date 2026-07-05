@@ -25,7 +25,7 @@ mix boundary.spec
 | `Arbiter.Audit` | `AnswerLineage` | `Arbiter.Policy`, `Arbiter.Repo`, `Arbiter.Retrieval` |
 | `Arbiter.Documents` | `Chunk`, `Document` | `Arbiter.Tenants` |
 | `Arbiter.Gateway` | `Error`, `Result`, `ToolCall` | `Arbiter.Policy`, `Arbiter.Retrieval` |
-| `Arbiter.Policy` | policy core struct와 module | 없음 |
+| `Arbiter.Policy` | policy core struct, authorizer, module | 없음 |
 | `Arbiter.ReadModels` | `AccessibleDocumentChunk`, `AccessibleDocumentChunkBuilder` | `Arbiter.Documents`, `Arbiter.Policy`, `Arbiter.Repo`, `Arbiter.Tenants` |
 | `Arbiter.Repo` | 없음 | 없음 |
 | `Arbiter.Retrieval` | retrieval guard struct와 module | `Arbiter.Policy` |

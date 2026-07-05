@@ -28,6 +28,7 @@
 
 - 최소 Policy DSL을 AST로 파싱합니다.
 - allow/deny decision을 평가합니다.
+- RBAC allow/deny와 ABAC retrieval scope 생성을 분리하는 순수 authorizer contract로 Gateway tool call을 authorize합니다.
 - decision reason과 policy scope를 생성합니다.
 - scope를 SQL predicate와 vector metadata filter로 compile합니다.
 - `Arbiter.Policy.Version`을 통해 MVP policy version을 증가시킵니다.
@@ -35,6 +36,7 @@
 경계 규칙:
 
 - Policy 모듈은 `Arbiter.Repo`, HTTP client, vector store, clock, ID generator, process messaging, audit persistence를 호출하지 않아야 합니다.
+- 이 boundary 안의 Authorizer 구현은 이미 로드된 request/user/role data를 받아 `Arbiter.Policy.Decision`을 반환합니다. Repo 기반 role store, Casbin, SaaS IAM, policy bundle loading은 이후 shell boundary가 소유합니다.
 
 ### Retrieval Core
 
@@ -69,6 +71,7 @@
 경계 규칙:
 
 - Gateway는 주입된 함수를 orchestration할 수 있지만 Repo, vector store, SaaS tool, HTTP client, cache, clock, ID generator를 직접 호출하지 않아야 합니다.
+- Gateway는 authorization 함수를 주입받으며 RBAC role lookup, ABAC attribute loading, policy storage, external authorizer client를 직접 소유하지 않아야 합니다.
 
 ### Audit Boundary
 

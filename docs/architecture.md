@@ -28,6 +28,7 @@ Responsibilities:
 
 - Parse minimal policy DSL into AST.
 - Evaluate allow/deny decisions.
+- Authorize Gateway tool calls through a pure authorizer contract that separates RBAC allow/deny from ABAC retrieval scope construction.
 - Build decision reasons and policy scopes.
 - Compile scopes into SQL predicates and vector metadata filters.
 - Increment MVP policy versions through `Arbiter.Policy.Version`.
@@ -35,6 +36,7 @@ Responsibilities:
 Boundary rule:
 
 - Policy modules should not call `Arbiter.Repo`, HTTP clients, vector stores, clocks, ID generators, process messaging, or audit persistence.
+- Authorizer implementations in this boundary receive already-loaded request/user/role data and return `Arbiter.Policy.Decision` values. Repo-backed role stores, Casbin, SaaS IAM, and policy bundle loading belong in later shell boundaries.
 
 ### Retrieval Core
 
@@ -69,6 +71,7 @@ Responsibilities:
 Boundary rule:
 
 - Gateway may orchestrate injected functions, but should not directly call Repo, vector stores, SaaS tools, HTTP clients, caches, clocks, or ID generators.
+- Gateway receives an authorization function and must not directly own RBAC role lookup, ABAC attribute loading, policy storage, or external authorizer clients.
 
 ### Audit Boundary
 

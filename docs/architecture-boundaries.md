@@ -25,7 +25,7 @@ Declared groups:
 | `Arbiter.Audit` | `AnswerLineage` | `Arbiter.Policy`, `Arbiter.Repo`, `Arbiter.Retrieval` |
 | `Arbiter.Documents` | `Chunk`, `Document` | `Arbiter.Tenants` |
 | `Arbiter.Gateway` | `Error`, `Result`, `ToolCall` | `Arbiter.Policy`, `Arbiter.Retrieval` |
-| `Arbiter.Policy` | policy core structs and modules | none |
+| `Arbiter.Policy` | policy core structs, authorizer, and modules | none |
 | `Arbiter.ReadModels` | `AccessibleDocumentChunk`, `AccessibleDocumentChunkBuilder` | `Arbiter.Documents`, `Arbiter.Policy`, `Arbiter.Repo`, `Arbiter.Tenants` |
 | `Arbiter.Repo` | none | none |
 | `Arbiter.Retrieval` | retrieval guard structs and modules | `Arbiter.Policy` |

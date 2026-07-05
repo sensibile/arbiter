@@ -5,6 +5,8 @@ defmodule Arbiter.GatewayTest do
   alias Arbiter.Adapters.Search.Memory
   alias Arbiter.Gateway
   alias Arbiter.Gateway.ToolCall
+  alias Arbiter.Policy.Authorizer
+  alias Arbiter.Policy.Authorizer.Static
   alias Arbiter.Policy.Decision
 
   describe "run_tool_call/2" do
@@ -197,6 +199,45 @@ defmodule Arbiter.GatewayTest do
       assert result.audit_event.accepted_chunk_ids == ["chunk_2"]
       assert result.audit_event.applied_filter["tenant_id"] == "tenant_a"
       assert result.audit_event.status == "allowed"
+    end
+
+    test "uses an injected authorizer executor without Gateway owning RBAC or ABAC loading" do
+      search =
+        start_supervised!(
+          {Memory,
+           chunks: [
+             chunk("chunk_1",
+               tenant_id: "tenant_a",
+               department_id: "finance",
+               sensitivity_level: 2
+             )
+           ]}
+        )
+
+      tool_call =
+        tool_call(
+          user_snapshot: %{
+            "id" => "user_123",
+            "tenant_id" => "tenant_a",
+            "department_ids" => ["finance"],
+            "clearance_level" => 3,
+            "policy_version" => "policy_v12"
+          }
+        )
+
+      assert {:ok, result} =
+               Gateway.run_tool_call(tool_call,
+                 tools: tools(Search.executor({Memory, search})),
+                 authorize: Authorizer.executor({Static, static_policy()})
+               )
+
+      assert result.policy_decision.reason == [
+               "rbac_allowed",
+               "tenant_scope_matched",
+               "abac_scope_built"
+             ]
+
+      assert Enum.map(result.allowed_chunks, & &1.id) == ["chunk_1"]
     end
 
     test "still fails closed if a search executor bypasses the Arbiter allowlist" do
@@ -583,6 +624,21 @@ defmodule Arbiter.GatewayTest do
   end
 
   defp authorize(decision), do: fn _tool_call -> {:ok, decision} end
+
+  defp static_policy do
+    %{
+      policy_version: "policy_v12",
+      role_assignments: %{"user_123" => ["analyst"]},
+      permissions: [
+        %{
+          role: "analyst",
+          action: "retrieve",
+          resource_type: "document_chunk",
+          tenant_id: "tenant_a"
+        }
+      ]
+    }
+  end
 
   defp assert_failed_closed(error, reason) do
     assert error.reason == reason

@@ -39,6 +39,7 @@ flowchart LR
 - Tenant, user, group, membership
 - Document와 chunk
 - Policy와 policy decision
+- Gateway authorization injection을 위한 static RBAC/ABAC authorizer contract
 - Agent run
 - Retrieval trace
 - 최소 Policy DSL 파싱과 평가

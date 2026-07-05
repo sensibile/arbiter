@@ -159,6 +159,7 @@ The MVP currently includes:
 - `Arbiter.Sync.OutboxCacheDispatch` for mapping tool and retrieval cache invalidation events to backend-neutral cache adapter commands.
 - `Arbiter.Adapters.Cache` and `Arbiter.Adapters.Cache.Memory` for scoped cache invalidation through a replaceable adapter contract.
 - `Arbiter.Adapters.Search` and `Arbiter.Adapters.Search.Memory` for guarded retrieval execution through a replaceable adapter contract.
+- `Arbiter.Policy.Authorizer` and `Arbiter.Policy.Authorizer.Static` for injected Gateway authorization with RBAC allow/deny and ABAC retrieval scope construction.
 - `Arbiter.Sync.OutboxProcessor.run_once/2` for one bounded pass that claims pending outbox rows, dispatches supported read model commands, and marks rows processed or failed.
 - `Arbiter.Sync.OutboxWorker` for optional supervised scheduling of bounded outbox processing passes.
 - Optional `locked_by` outbox ownership for worker-visible claim provenance and terminal update checks.

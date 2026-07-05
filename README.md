@@ -39,6 +39,7 @@ The current implementation has completed the first MVP pass:
 - Tenants, users, groups, and memberships
 - Documents and chunks
 - Policies and policy decisions
+- Static RBAC/ABAC authorizer contract for Gateway authorization injection
 - Agent runs
 - Retrieval traces
 - Minimal policy DSL parsing and evaluation
