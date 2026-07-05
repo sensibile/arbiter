@@ -109,6 +109,7 @@ defmodule Arbiter.MixProject do
       Arbiter.Audit.AnswerLineage,
       Arbiter.Documents.Chunk,
       Arbiter.Documents.Document,
+      Arbiter.Observability.AuditTelemetry,
       Arbiter.Policy.Policy,
       Arbiter.Policy.PolicyDecision,
       Arbiter.ReadModels,

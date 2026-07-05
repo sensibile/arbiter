@@ -2,6 +2,6 @@ defmodule Arbiter.Observability do
   @moduledoc false
 
   use Boundary,
-    deps: [Arbiter.Gateway],
-    exports: [GatewayTelemetry]
+    deps: [Arbiter.Audit, Arbiter.Gateway],
+    exports: [AuditTelemetry, GatewayTelemetry]
 end

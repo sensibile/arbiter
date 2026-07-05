@@ -117,6 +117,13 @@ defmodule ArbiterWeb.Telemetry do
         description: "Chunks rejected by observed Gateway tool calls"
       ),
 
+      # Arbiter Audit Metrics
+      summary("arbiter.audit.record.run.duration",
+        tags: [:operation, :status, :result],
+        unit: {:native, :millisecond},
+        description: "Duration of one observed audit persistence operation"
+      ),
+
       # VM Metrics
       summary("vm.memory.total", unit: {:byte, :kilobyte}),
       summary("vm.total_run_queue_lengths.total"),

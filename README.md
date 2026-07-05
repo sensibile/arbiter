@@ -141,6 +141,11 @@ Gateway runtime telemetry is available through
 bounded metadata only. It must not include tenant, user, agent run, query, or
 chunk identifiers.
 
+Audit persistence telemetry is available through
+`Arbiter.Observability.AuditTelemetry`. It emits
+`[:arbiter, :audit, :record, :run]` with duration and bounded operation status
+metadata only.
+
 ## Architecture Checks
 
 Boundary enforcement runs during compilation through the `:boundary` compiler.

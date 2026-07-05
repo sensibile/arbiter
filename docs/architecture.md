@@ -110,11 +110,14 @@ Responsibilities:
 - Wrap Gateway tool calls when runtime telemetry is desired.
 - Emit `[:arbiter, :gateway, :tool_call, :run]` telemetry with duration and chunk count measurements.
 - Keep telemetry metadata bounded to status, decision, primary reason, tool, action, resource type, and policy version.
+- Wrap audit persistence operations when runtime telemetry is desired.
+- Emit `[:arbiter, :audit, :record, :run]` telemetry with duration and bounded operation status metadata.
 
 Boundary rule:
 
 - Observability modules may emit telemetry, but must not persist audit records or call Repo, policy stores, vector/search adapters, caches, HTTP clients, clocks, or ID generators.
 - Gateway telemetry must not include tenant, user, agent run, query, prompt, chunk, payload, or row identifiers.
+- Audit telemetry must not include tenant, user, agent run, answer, policy decision, query, chunk, payload, or row identifiers.
 
 ### Audit Boundary
 

@@ -110,11 +110,14 @@
 - Runtime telemetry가 필요할 때 Gateway tool call을 감쌉니다.
 - Duration과 chunk count measurement를 담은 `[:arbiter, :gateway, :tool_call, :run]` telemetry를 방출합니다.
 - Telemetry metadata는 status, decision, primary reason, tool, action, resource type, policy version으로 제한합니다.
+- Runtime telemetry가 필요할 때 audit persistence operation을 감쌉니다.
+- Duration과 제한된 operation status metadata를 담은 `[:arbiter, :audit, :record, :run]` telemetry를 방출합니다.
 
 경계 규칙:
 
 - Observability 모듈은 telemetry를 방출할 수 있지만 audit record를 저장하거나 Repo, policy store, vector/search adapter, cache, HTTP client, clock, ID generator를 호출하지 않아야 합니다.
 - Gateway telemetry에는 tenant, user, agent run, query, prompt, chunk, payload, row identifier를 포함하지 않아야 합니다.
+- Audit telemetry에는 tenant, user, agent run, answer, policy decision, query, chunk, payload, row identifier를 포함하지 않아야 합니다.
 
 ### Audit Boundary
 
