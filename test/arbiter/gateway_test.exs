@@ -3,6 +3,7 @@ defmodule Arbiter.GatewayTest do
 
   alias Arbiter.Adapters.Search
   alias Arbiter.Adapters.Search.Memory
+  alias Arbiter.Authorizers.Casbin
   alias Arbiter.Gateway
   alias Arbiter.Gateway.ToolCall
   alias Arbiter.Policy.Authorizer
@@ -238,6 +239,100 @@ defmodule Arbiter.GatewayTest do
              ]
 
       assert Enum.map(result.allowed_chunks, & &1.id) == ["chunk_1"]
+    end
+
+    test "uses a Casbin authorizer executor without Gateway knowing the policy engine" do
+      search =
+        start_supervised!(
+          {Memory,
+           chunks: [
+             chunk("chunk_1",
+               tenant_id: "tenant_a",
+               department_id: "finance",
+               sensitivity_level: 2
+             )
+           ]}
+        )
+
+      test_pid = self()
+
+      enforce = fn request ->
+        send(test_pid, {:casbin_request, request})
+        request.subject == "user:user_123" and request.action == "retrieve"
+      end
+
+      tool_call =
+        tool_call(
+          user_snapshot: %{
+            "id" => "user_123",
+            "tenant_id" => "tenant_a",
+            "department_ids" => ["finance"],
+            "clearance_level" => 3,
+            "policy_version" => "policy_v12"
+          }
+        )
+
+      assert {:ok, result} =
+               Gateway.run_tool_call(tool_call,
+                 tools: tools(Search.executor({Memory, search})),
+                 authorize:
+                   Authorizer.executor(
+                     {Casbin, %{policy_version: "policy_v12", enforce: enforce}}
+                   )
+               )
+
+      assert_receive {:casbin_request,
+                      %{
+                        tenant_id: "tenant_a",
+                        domain: "tenant_a",
+                        user_id: "user_123",
+                        subject: "user:user_123",
+                        action: "retrieve",
+                        resource_type: "document_chunk",
+                        resource_id: nil,
+                        object: "document_chunk:*"
+                      }}
+
+      assert result.policy_decision.reason == [
+               "rbac_allowed",
+               "tenant_scope_matched",
+               "abac_scope_built"
+             ]
+
+      assert Enum.map(result.allowed_chunks, & &1.id) == ["chunk_1"]
+    end
+
+    test "does not execute a tool when an injected Casbin authorizer denies" do
+      test_pid = self()
+
+      execute = fn _guarded_query ->
+        send(test_pid, :executed)
+        {:ok, []}
+      end
+
+      tool_call =
+        tool_call(
+          user_snapshot: %{
+            "id" => "user_123",
+            "tenant_id" => "tenant_a",
+            "department_ids" => ["finance"],
+            "clearance_level" => 3,
+            "policy_version" => "policy_v12"
+          }
+        )
+
+      assert {:deny, result} =
+               Gateway.run_tool_call(tool_call,
+                 tools: tools(execute),
+                 authorize:
+                   Authorizer.executor(
+                     {Casbin, %{policy_version: "policy_v12", enforce: fn _request -> false end}}
+                   )
+               )
+
+      refute_received :executed
+      assert result.policy_decision.reason == ["rbac_denied"]
+      assert result.audit_event.status == "denied"
     end
 
     test "still fails closed if a search executor bypasses the Arbiter allowlist" do
