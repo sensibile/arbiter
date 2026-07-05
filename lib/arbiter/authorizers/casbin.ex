@@ -8,6 +8,7 @@ defmodule Arbiter.Authorizers.Casbin do
   """
 
   alias Arbiter.Policy.Authorizer.Core
+  alias Arbiter.Policy.DecisionReason
 
   @behaviour Arbiter.Policy.Authorizer
 
@@ -22,7 +23,7 @@ defmodule Arbiter.Authorizers.Casbin do
          {:ok, true} <- enforce(enforce, request_tuple, timeout_ms) do
       {:ok, Core.allow(policy_version, request_scope, roles)}
     else
-      {:ok, false} -> {:ok, Core.deny(["rbac_denied"], policy_version(target))}
+      {:ok, false} -> {:ok, Core.deny([DecisionReason.rbac_denied()], policy_version(target))}
       {:error, reason} -> {:error, reason}
     end
   end

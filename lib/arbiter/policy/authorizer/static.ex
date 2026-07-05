@@ -7,6 +7,7 @@ defmodule Arbiter.Policy.Authorizer.Static do
   """
 
   alias Arbiter.Policy.Authorizer.Core
+  alias Arbiter.Policy.DecisionReason
 
   @behaviour Arbiter.Policy.Authorizer
 
@@ -56,7 +57,7 @@ defmodule Arbiter.Policy.Authorizer.Static do
         :ok
 
       true ->
-        {:deny, ["rbac_denied"], policy_version}
+        {:deny, [DecisionReason.rbac_denied()], policy_version}
     end
   end
 

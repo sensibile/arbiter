@@ -21,6 +21,7 @@ defmodule Arbiter.Gateway do
   alias Arbiter.Gateway.Result
   alias Arbiter.Gateway.ToolCall
   alias Arbiter.Policy.Decision
+  alias Arbiter.Policy.DecisionReason
   alias Arbiter.Retrieval.Guard
 
   def run_tool_call(%ToolCall{} = tool_call, opts) when is_list(opts) do
@@ -52,19 +53,19 @@ defmodule Arbiter.Gateway do
   def run_tool_call(_tool_call, _opts) do
     {:error,
      error(:invalid_tool_call, "tool call must be an Arbiter.Gateway.ToolCall", nil, nil,
-       reason: ["invalid_tool_call"]
+       reason: [DecisionReason.from_error(:invalid_tool_call)]
      )}
   end
 
   defp fetch_tool(%ToolCall{} = tool_call, tools) when is_map(tools) do
     case Map.fetch(tools, tool_call.tool) do
       {:ok, tool} -> validate_tool_contract(tool_call, tool)
-      :error -> {:error, fail_closed(tool_call, nil, :unknown_tool, ["unknown_tool"])}
+      :error -> {:error, fail_closed(tool_call, nil, :unknown_tool)}
     end
   end
 
   defp fetch_tool(tool_call, _tools) do
-    {:error, fail_closed(tool_call, nil, :invalid_tool_registry, ["invalid_tool_registry"])}
+    {:error, fail_closed(tool_call, nil, :invalid_tool_registry)}
   end
 
   defp validate_tool_contract(
@@ -76,12 +77,12 @@ defmodule Arbiter.Gateway do
     if is_function(Map.get(tool, :execute), 1) do
       {:ok, tool}
     else
-      {:error, fail_closed(tool_call, nil, :invalid_tool_contract, ["invalid_tool_contract"])}
+      {:error, fail_closed(tool_call, nil, :invalid_tool_contract)}
     end
   end
 
   defp validate_tool_contract(tool_call, _tool) do
-    {:error, fail_closed(tool_call, nil, :tool_contract_mismatch, ["tool_contract_mismatch"])}
+    {:error, fail_closed(tool_call, nil, :tool_contract_mismatch)}
   end
 
   defp authorize_call(tool_call, authorize) when is_function(authorize, 1) do
@@ -93,23 +94,22 @@ defmodule Arbiter.Gateway do
         {:deny, decision}
 
       {:error, _reason} ->
-        {:error, fail_closed(tool_call, nil, :authorization_failed, ["authorization_failed"])}
+        {:error, fail_closed(tool_call, nil, :authorization_failed)}
 
       _other ->
-        {:error, fail_closed(tool_call, nil, :authorization_failed, ["authorization_failed"])}
+        {:error, fail_closed(tool_call, nil, :authorization_failed)}
     end
   end
 
   defp authorize_call(tool_call, _authorize) do
-    {:error, fail_closed(tool_call, nil, :authorization_failed, ["authorization_failed"])}
+    {:error, fail_closed(tool_call, nil, :authorization_failed)}
   end
 
   defp validate_tenant_scope(%ToolCall{} = tool_call, %Decision{} = decision) do
     if decision.scope["tenant_id"] == tool_call.tenant_id do
       :ok
     else
-      {:error,
-       fail_closed(tool_call, decision, :tenant_scope_mismatch, ["tenant_scope_mismatch"])}
+      {:error, fail_closed(tool_call, decision, :tenant_scope_mismatch)}
     end
   end
 
@@ -145,7 +145,7 @@ defmodule Arbiter.Gateway do
         :ok
 
       _stale_policy_version ->
-        {:error, fail_closed(tool_call, decision, reason, [Atom.to_string(reason)])}
+        {:error, fail_closed(tool_call, decision, reason)}
     end
   end
 
@@ -175,11 +175,10 @@ defmodule Arbiter.Gateway do
         {:error, error}
 
       {:error, reason} when is_atom(reason) ->
-        {:error, fail_closed(tool_call, decision, reason, [Atom.to_string(reason)])}
+        {:error, fail_closed(tool_call, decision, reason)}
 
       {:error, guard_error} ->
-        {:error,
-         fail_closed(tool_call, decision, guard_error.reason, [Atom.to_string(guard_error.reason)])}
+        {:error, fail_closed(tool_call, decision, guard_error.reason)}
     end
   end
 
@@ -273,12 +272,11 @@ defmodule Arbiter.Gateway do
        tool_call,
        decision,
        :retrieval_validation_failed,
-       ["retrieval_validation_failed"],
        guard_result: guard_result
      )}
   end
 
-  defp fail_closed(tool_call, decision, reason, event_reasons, opts \\ []) do
+  defp fail_closed(tool_call, decision, reason, opts \\ []) do
     message = reason |> Atom.to_string() |> String.replace("_", " ")
 
     %Error{
@@ -286,7 +284,7 @@ defmodule Arbiter.Gateway do
       message: message,
       audit_event:
         audit_event(tool_call, decision,
-          reason: event_reasons,
+          reason: [DecisionReason.from_error(reason)],
           status: "failed_closed",
           decision: "deny",
           guard_result: Keyword.get(opts, :guard_result)

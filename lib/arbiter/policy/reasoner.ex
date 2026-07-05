@@ -7,16 +7,18 @@ defmodule Arbiter.Policy.Reasoner do
   later without changing parser flow.
   """
 
+  alias Arbiter.Policy.DecisionReason
+
   def infer({:path, "user", ["tenant_id"]}, :eq, {:path, "chunk", ["tenant_id"]}) do
-    "same_tenant"
+    DecisionReason.same_tenant()
   end
 
   def infer({:path, "user", ["status"]}, :eq, {:literal, "active"}) do
-    "active_user"
+    DecisionReason.active_user()
   end
 
   def infer({:path, "chunk", ["source"]}, :eq, {:literal, _source}) do
-    "source_matched"
+    DecisionReason.source_matched()
   end
 
   def infer(
@@ -24,11 +26,11 @@ defmodule Arbiter.Policy.Reasoner do
         :gte,
         {:path, "chunk", ["sensitivity_level"]}
       ) do
-    "clearance_ok"
+    DecisionReason.clearance_ok()
   end
 
   def infer({:path, "chunk", ["department_id"]}, :in, {:path, "user", ["department_ids"]}) do
-    "department_scope_matched"
+    DecisionReason.department_scope_matched()
   end
 
   def infer(left, operator, right) do

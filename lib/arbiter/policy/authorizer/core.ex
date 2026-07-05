@@ -8,6 +8,7 @@ defmodule Arbiter.Policy.Authorizer.Core do
 
   alias Arbiter.Policy.Attributes
   alias Arbiter.Policy.Decision
+  alias Arbiter.Policy.DecisionReason
 
   def request_scope(request) when is_map(request) do
     with {:ok, tenant_id} <- fetch_request_string(request, :tenant_id),
@@ -41,7 +42,11 @@ defmodule Arbiter.Policy.Authorizer.Core do
   def allow(policy_version, request_scope, roles) do
     %Decision{
       decision: :allow,
-      reason: ["rbac_allowed", "tenant_scope_matched", "abac_scope_built"],
+      reason: [
+        DecisionReason.rbac_allowed(),
+        DecisionReason.tenant_scope_matched(),
+        DecisionReason.abac_scope_built()
+      ],
       policy_version: policy_version,
       scope: %{
         "tenant_id" => request_scope.tenant_id,

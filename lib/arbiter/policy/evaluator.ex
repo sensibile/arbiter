@@ -6,6 +6,7 @@ defmodule Arbiter.Policy.Evaluator do
   alias Arbiter.Policy.AST
   alias Arbiter.Policy.Attributes
   alias Arbiter.Policy.Decision
+  alias Arbiter.Policy.DecisionReason
 
   def evaluate(ast, context, opts \\ [])
 
@@ -17,8 +18,8 @@ defmodule Arbiter.Policy.Evaluator do
       |> Enum.reduce_while([], fn condition, reasons ->
         case condition_satisfied?(condition, context) do
           {:ok, true} -> {:cont, [condition.reason | reasons]}
-          {:ok, false} -> {:halt, {:deny, ["#{condition.reason}_failed"]}}
-          {:error, _reason} -> {:halt, {:deny, ["evaluation_error"]}}
+          {:ok, false} -> {:halt, {:deny, [DecisionReason.failed(condition.reason)]}}
+          {:error, _reason} -> {:halt, {:deny, [DecisionReason.evaluation_error()]}}
         end
       end)
       |> case do
@@ -28,7 +29,7 @@ defmodule Arbiter.Policy.Evaluator do
         reasons ->
           case build_scope(context) do
             {:ok, scope} -> allow(Enum.reverse(reasons), policy_version, scope)
-            {:error, _reason} -> deny(["scope_compile_failed"], policy_version)
+            {:error, _reason} -> deny([DecisionReason.scope_compile_failed()], policy_version)
           end
       end
     else
@@ -39,7 +40,7 @@ defmodule Arbiter.Policy.Evaluator do
   def evaluate(_ast, _context, opts) do
     opts
     |> Keyword.get(:policy_version, "unknown")
-    |> then(&deny(["evaluation_error"], &1))
+    |> then(&deny([DecisionReason.evaluation_error()], &1))
   end
 
   defp validate_intent(%AST{} = ast, context, opts) do
@@ -54,14 +55,14 @@ defmodule Arbiter.Policy.Evaluator do
         :ok
 
       not Enum.all?(Map.values(intent), &valid_intent_value?/1) ->
-        {:deny, ["policy_intent_missing"]}
+        {:deny, [DecisionReason.policy_intent_missing()]}
 
       intent.subject == ast.subject and intent.action == ast.action and
           intent.resource == ast.resource ->
         :ok
 
       true ->
-        {:deny, ["policy_intent_mismatch"]}
+        {:deny, [DecisionReason.policy_intent_mismatch()]}
     end
   end
 

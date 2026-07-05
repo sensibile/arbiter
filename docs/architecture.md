@@ -31,6 +31,7 @@ Responsibilities:
 - Enforce request subject/action/resource intent against the policy `allow` line when intent is provided.
 - Authorize Gateway tool calls through a pure authorizer contract that separates RBAC allow/deny from ABAC retrieval scope construction.
 - Build decision reasons and policy scopes.
+- Keep shared audit/decision reason identifiers in `Arbiter.Policy.DecisionReason`.
 - Compile scopes into SQL predicates and vector metadata filters.
 - Increment MVP policy versions through `Arbiter.Policy.Version`.
 
@@ -38,6 +39,7 @@ Boundary rule:
 
 - Policy modules should not call `Arbiter.Repo`, HTTP clients, vector stores, clocks, ID generators, process messaging, or audit persistence.
 - `Arbiter.Policy.Engine` is a pure facade over parsing and evaluation. It does not load policy bundles or execute external authorizers.
+- Shared decision reasons are stable string identifiers because audit rows and lineage records persist them.
 - Authorizer implementations in this boundary receive already-loaded request/user/role data and return `Arbiter.Policy.Decision` values. `Arbiter.Policy.Authorizer.Core` owns shared pure request identity validation, ABAC scope extraction, and decision shaping.
 - Authorizers must fail closed when the request user id, loaded user snapshot id, or tenant scope do not match.
 

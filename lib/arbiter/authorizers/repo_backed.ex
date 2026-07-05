@@ -11,6 +11,7 @@ defmodule Arbiter.Authorizers.RepoBacked do
 
   alias Arbiter.Policy.Authorizer.Core
   alias Arbiter.Policy.Authorizer.Static
+  alias Arbiter.Policy.DecisionReason
   alias Arbiter.Repo
   alias Arbiter.Tenants.User
 
@@ -83,7 +84,7 @@ defmodule Arbiter.Authorizers.RepoBacked do
 
   defp authorize_loaded_user(_permissions, _request, %User{status: status} = user)
        when status != "active" do
-    {:ok, Core.deny(["inactive_user"], user.policy_version)}
+    {:ok, Core.deny([DecisionReason.inactive_user()], user.policy_version)}
   end
 
   defp authorize_loaded_user(permissions, request, %User{} = user) do
