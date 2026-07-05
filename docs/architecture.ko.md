@@ -88,6 +88,7 @@
 - 명시적인 registry에서 tool contract를 확인합니다.
 - 주입된 authorization 함수를 호출합니다.
 - tenant scope mismatch, stale user policy snapshot, stale resource policy snapshot, invalid filter, tool failure, retrieval validation failure를 fail-close 처리합니다.
+- 주입된 authorizer가 raise 또는 throw하더라도 fail-close 처리합니다.
 - 안전한 authorizer error atom은 fail-closed audit reason으로 보존하고, 안전하지 않은 error shape는 `authorization_failed`로 축약합니다.
 - 현재 tenant, user, policy version에 대해 접근 가능한 chunk id를 얻기 위해 선택적으로 주입된 read model scope 함수를 호출합니다.
 - Retrieval tool adapter에는 Arbiter가 guard한 query만 전달합니다.

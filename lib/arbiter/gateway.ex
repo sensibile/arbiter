@@ -86,7 +86,7 @@ defmodule Arbiter.Gateway do
   end
 
   defp authorize_call(tool_call, authorize) when is_function(authorize, 1) do
-    case authorize.(tool_call) do
+    case execute_authorizer(authorize, tool_call) do
       {:ok, %Decision{decision: :allow} = decision} ->
         {:ok, decision}
 
@@ -107,6 +107,14 @@ defmodule Arbiter.Gateway do
 
   defp authorization_error_reason(reason) when is_atom(reason), do: reason
   defp authorization_error_reason(_reason), do: :authorization_failed
+
+  defp execute_authorizer(authorize, tool_call) do
+    authorize.(tool_call)
+  rescue
+    _exception -> {:error, :authorization_failed}
+  catch
+    _kind, _reason -> {:error, :authorization_failed}
+  end
 
   defp validate_tenant_scope(%ToolCall{} = tool_call, %Decision{} = decision) do
     if decision.scope["tenant_id"] == tool_call.tenant_id do

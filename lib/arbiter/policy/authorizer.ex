@@ -15,7 +15,11 @@ defmodule Arbiter.Policy.Authorizer do
 
   def authorize({authorizer, target}, request) when is_atom(authorizer) do
     with {:ok, request} <- AuthorizationRequest.normalize(request) do
-      authorizer.authorize(target, request)
+      if Code.ensure_loaded?(authorizer) and function_exported?(authorizer, :authorize, 2) do
+        authorizer.authorize(target, request)
+      else
+        {:error, :invalid_authorizer}
+      end
     end
   end
 

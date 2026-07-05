@@ -559,6 +559,21 @@ defmodule Arbiter.GatewayTest do
       assert_failed_closed(error, :authorization_failed)
     end
 
+    test "fails closed when authorization raises or throws" do
+      for authorize <- [
+            fn _tool_call -> raise "policy engine unavailable" end,
+            fn _tool_call -> throw(:policy_engine_unavailable) end
+          ] do
+        assert {:error, error} =
+                 Gateway.run_tool_call(tool_call(),
+                   tools: tools(fn _guarded_query -> {:ok, []} end),
+                   authorize: authorize
+                 )
+
+        assert_failed_closed(error, :authorization_failed)
+      end
+    end
+
     test "fails closed when authorization dependency is missing" do
       assert {:error, error} =
                Gateway.run_tool_call(tool_call(),
