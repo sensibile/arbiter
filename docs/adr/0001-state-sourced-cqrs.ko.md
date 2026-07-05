@@ -158,6 +158,7 @@ MVP에는 현재 다음 구현이 포함되어 있습니다.
 - User-access invalidation 및 rebuild outbox event를 read model command로 매핑하는 `Arbiter.Sync.OutboxReadModelDispatch`
 - Pending outbox row를 claim하고 지원되는 read model command를 dispatch한 뒤 row를 processed 또는 failed로 표시하는 bounded pass인 `Arbiter.Sync.OutboxProcessor.run_once/2`
 - Bounded outbox processing pass를 선택적으로 supervised scheduling하는 `Arbiter.Sync.OutboxWorker`
+- Duration, status, limit, aggregate count만 포함하는 `[:arbiter, :sync, :outbox, :processor, :run]` outbox processor telemetry
 - 기존 row를 invalidation한 뒤 현재 user와 chunk 상태에서 active projection을 다시 만드는 `Arbiter.ReadModels.rebuild_user_access_projection/4` 기반 `rebuild_user_access_projection` 실행
 - User/resource policy version에 대한 Gateway stale snapshot check
 - Hot-path core에 직접 Repo/read-model dependency를 만들지 않고 accessible chunk id를 retrieval adapter에 전달하는 Gateway read model scope injection

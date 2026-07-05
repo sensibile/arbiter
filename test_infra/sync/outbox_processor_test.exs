@@ -24,6 +24,35 @@ defmodule Arbiter.Sync.OutboxProcessorTest do
                OutboxProcessor.run_once(10, now: @now)
     end
 
+    test "emits bounded processing telemetry without row identifiers" do
+      attach_processor_telemetry()
+
+      tenant = tenant_fixture("outbox-processor-telemetry")
+      user_id = Ecto.UUID.generate()
+
+      outbox_event_fixture(tenant,
+        aggregate_id: user_id,
+        payload: invalidate_user_access_payload(tenant.id, user_id, "policy_v1", "policy_v2")
+      )
+
+      assert {:ok, %{claimed: 1, processed: 1, failed: 0, errors: 0}} =
+               OutboxProcessor.run_once(10, now: @now)
+
+      assert_receive {:outbox_processor_telemetry, measurements, metadata}
+
+      assert %{
+               claimed: 1,
+               processed: 1,
+               failed: 0,
+               errors: 0,
+               duration: duration
+             } = measurements
+
+      assert is_integer(duration)
+      assert duration >= 0
+      assert metadata == %{limit: 10, status: :ok}
+    end
+
     test "supports a one-argument processing pass with the default clock" do
       tenant = tenant_fixture("outbox-processor-tenant")
       user_id = Ecto.UUID.generate()
@@ -152,4 +181,20 @@ defmodule Arbiter.Sync.OutboxProcessorTest do
     end
   end
 
+  defp attach_processor_telemetry do
+    test_pid = self()
+    handler_id = {__MODULE__, test_pid, System.unique_integer([:positive])}
+
+    :ok =
+      :telemetry.attach(
+        handler_id,
+        OutboxProcessor.telemetry_event(),
+        fn _event, measurements, metadata, pid ->
+          send(pid, {:outbox_processor_telemetry, measurements, metadata})
+        end,
+        test_pid
+      )
+
+    on_exit(fn -> :telemetry.detach(handler_id) end)
+  end
 end

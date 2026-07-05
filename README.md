@@ -99,6 +99,9 @@ config :arbiter, Arbiter.Sync.OutboxWorker,
   limit: 100
 ```
 
+Each outbox processing pass emits `[:arbiter, :sync, :outbox, :processor, :run]`
+telemetry with duration, status, limit, and aggregate row counts only.
+
 ## Architecture Checks
 
 Useful built-in dependency checks:

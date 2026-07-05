@@ -75,6 +75,29 @@ defmodule ArbiterWeb.Telemetry do
           "The time the connection spent waiting before being checked out for the query"
       ),
 
+      # Arbiter Sync Metrics
+      summary("arbiter.sync.outbox.processor.run.duration",
+        tags: [:status],
+        unit: {:native, :millisecond},
+        description: "Duration of one bounded outbox processing pass"
+      ),
+      sum("arbiter.sync.outbox.processor.run.claimed",
+        tags: [:status],
+        description: "Outbox rows claimed by bounded processing passes"
+      ),
+      sum("arbiter.sync.outbox.processor.run.processed",
+        tags: [:status],
+        description: "Outbox rows marked processed by bounded processing passes"
+      ),
+      sum("arbiter.sync.outbox.processor.run.failed",
+        tags: [:status],
+        description: "Outbox rows marked failed by bounded processing passes"
+      ),
+      sum("arbiter.sync.outbox.processor.run.errors",
+        tags: [:status],
+        description: "Outbox rows or passes that ended in processor errors"
+      ),
+
       # VM Metrics
       summary("vm.memory.total", unit: {:byte, :kilobyte}),
       summary("vm.total_run_queue_lengths.total"),

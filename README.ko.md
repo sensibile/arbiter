@@ -98,6 +98,8 @@ config :arbiter, Arbiter.Sync.OutboxWorker,
   limit: 100
 ```
 
+각 outbox processing pass는 duration, status, limit, aggregate row count만 담은 `[:arbiter, :sync, :outbox, :processor, :run]` telemetry를 방출합니다.
+
 ## 아키텍처 검사
 
 바로 사용할 수 있는 내장 dependency 검사 명령입니다.

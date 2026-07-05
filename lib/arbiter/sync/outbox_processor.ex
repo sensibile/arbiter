@@ -9,16 +9,31 @@ defmodule Arbiter.Sync.OutboxProcessor do
   alias Arbiter.Sync.OutboxConsumer
   alias Arbiter.Sync.OutboxEvent
 
+  @telemetry_event [:arbiter, :sync, :outbox, :processor, :run]
+
+  def telemetry_event, do: @telemetry_event
+
   def run_once(limit, opts \\ [])
 
   def run_once(limit, opts) when is_integer(limit) and limit > 0 do
-    with {:ok, events} <- OutboxConsumer.claim_available(limit, opts) do
-      results = Enum.map(events, &process_event(&1, opts))
-      {:ok, summarize_results(events, results)}
-    end
+    start_time = System.monotonic_time()
+
+    result =
+      with {:ok, events} <- OutboxConsumer.claim_available(limit, opts) do
+        results = Enum.map(events, &process_event(&1, opts))
+        {:ok, summarize_results(events, results)}
+      end
+
+    emit_telemetry(result, limit, start_time)
+    result
   end
 
-  def run_once(_limit, _opts), do: {:error, :invalid_limit}
+  def run_once(limit, _opts) do
+    result = {:error, :invalid_limit}
+
+    emit_telemetry(result, limit, System.monotonic_time())
+    result
+  end
 
   defp process_event(%OutboxEvent{} = event, opts) do
     case OutboxConsumer.process_read_model_event(event, opts) do
@@ -43,4 +58,29 @@ defmodule Arbiter.Sync.OutboxProcessor do
   defp result_status({:processed, _event}), do: :processed
   defp result_status({:failed, _event}), do: :failed
   defp result_status({:error, _reason, _event}), do: :error
+
+  defp emit_telemetry({:ok, summary}, limit, start_time) do
+    measurements =
+      summary
+      |> Map.take([:claimed, :processed, :failed, :errors])
+      |> Map.put(:duration, System.monotonic_time() - start_time)
+
+    :telemetry.execute(@telemetry_event, measurements, %{limit: limit, status: :ok})
+  end
+
+  defp emit_telemetry({:error, reason}, limit, start_time) do
+    measurements = %{
+      claimed: 0,
+      processed: 0,
+      failed: 0,
+      errors: 1,
+      duration: System.monotonic_time() - start_time
+    }
+
+    :telemetry.execute(@telemetry_event, measurements, %{
+      limit: limit,
+      status: :error,
+      reason: reason
+    })
+  end
 end
