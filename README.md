@@ -6,6 +6,30 @@ Arbiter is a policy-aware access gateway for Agentic RAG systems.
 
 It ensures that AI agents can only retrieve, use, and cite data the current user is allowed to access.
 
+## Problem
+
+Agentic RAG systems often connect tool calls directly to retrieval infrastructure. That makes authorization hard to enforce consistently: filters can be omitted, stale policy snapshots can leak old access, and unauthorized chunks may reach prompt construction before anyone notices.
+
+Arbiter sits between agent tool calls and retrieval infrastructure. It turns policy decisions into enforced search scope, validates retrieved chunks again before prompt construction, and records audit lineage for both allow and deny paths.
+
+```mermaid
+flowchart LR
+  Agent["Agent / RAG App"] --> Gateway["Arbiter Gateway"]
+  Gateway --> Policy["Policy Decision"]
+  Policy --> Scope["Scope Compiler"]
+  Scope --> Guard["Guarded Search Query"]
+  Guard --> Search["Vector / Search Adapter"]
+  Search --> Validate["Post-Retrieval Validation"]
+  Validate --> Context["Allowed Context Only"]
+  Context --> Answer["LLM Answer"]
+
+  Policy --> Audit["Audit Lineage"]
+  Validate --> Audit
+  Revoke["Policy Revoke"] --> Outbox["Outbox Invalidation"]
+  Outbox --> Refresh["Read Model / Cache Refresh"]
+  Refresh --> Gateway
+```
+
 ## Current Scope
 
 This repository is a Phoenix/Ecto implementation of the MVP described in `ARBITER_DIRECTION.md`.
