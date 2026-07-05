@@ -162,22 +162,27 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
       assert failed_event.last_error == "unsupported_read_model_command"
     end
 
-    test "marks known but unimplemented read model operations failed" do
-      tenant = tenant_fixture("outbox-consumer-tenant")
-      user_id = Ecto.UUID.generate()
+    test "rebuilds user access projections and marks rebuild events processed" do
+      %{tenant: tenant, user: user, chunk: chunk} =
+        read_model_fixture_scope(prefix: "outbox-consumer-rebuild", policy_version: "policy_v13")
 
       event =
         tenant
         |> outbox_event_fixture(
           event_type: "rebuild_user_access_projection",
-          aggregate_id: user_id,
-          payload: rebuild_user_access_payload(tenant.id, user_id, "policy_v13")
+          aggregate_id: user.id,
+          payload: rebuild_user_access_payload(tenant.id, user.id, "policy_v13")
         )
         |> claim!()
 
-      assert {:error, failed_event} = OutboxConsumer.process_read_model_event(event, now: @now)
-      assert failed_event.status == "failed"
-      assert failed_event.last_error == "unsupported_read_model_operation"
+      assert {:ok, processed_event} = OutboxConsumer.process_read_model_event(event, now: @now)
+      assert processed_event.status == "processed"
+
+      assert ReadModels.accessible_chunk_ids(%{
+               tenant_id: tenant.id,
+               user_id: user.id,
+               user_policy_version: "policy_v13"
+             }) == [chunk.id]
     end
   end
 

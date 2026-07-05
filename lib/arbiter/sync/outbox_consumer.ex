@@ -2,8 +2,9 @@ defmodule Arbiter.Sync.OutboxConsumer do
   @moduledoc """
   Repo boundary for outbox consumer state changes.
 
-  This module claims and marks outbox rows. It does not execute projection,
-  cache, or vector/search adapters; supervised workers can compose those later.
+  This module claims outbox rows, executes supported read model operations, and
+  marks rows terminal. Cache, process, vector, and search adapters remain outside
+  this boundary.
   """
 
   import Ecto.Query
@@ -92,8 +93,14 @@ defmodule Arbiter.Sync.OutboxConsumer do
     )
   end
 
-  defp execute_read_model_command({:ok, %{operation: _operation}}),
-    do: {:error, :unsupported_read_model_operation}
+  defp execute_read_model_command({:ok, %{operation: :rebuild_user_access_projection} = command}) do
+    ReadModels.rebuild_user_access_projection(
+      command.tenant_id,
+      command.user_id,
+      command.user_policy_version,
+      command.rebuild_requested_at
+    )
+  end
 
   defp execute_read_model_command({:error, reason}), do: {:error, reason}
 

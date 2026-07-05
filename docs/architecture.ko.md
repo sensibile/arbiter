@@ -121,7 +121,8 @@
 - `Arbiter.Sync.OutboxProcessor.run_once/2`를 통해 bounded outbox processing pass를 한 번 실행합니다.
 - Persisted `id`, `attempts`, `locked_at`이 claim한 row와 여전히 일치할 때만 claimed row를 terminal 상태로 표시합니다.
 - `invalidate_user_access_cache` event를 `Arbiter.ReadModels.invalidate_user_access/4`로 dispatch해서 revoke 후 오래된 `accessible_document_chunks` row를 invalidation합니다.
-- `rebuild_user_access_projection` event를 검증된 read model command로 매핑합니다. Command contract는 구현되어 있지만 rebuild executor가 생기기 전까지 실행은 의도적으로 unsupported이며, 해당 row는 조용히 성공하지 않고 `failed`로 표시됩니다.
+- `rebuild_user_access_projection` event를 `Arbiter.ReadModels.rebuild_user_access_projection/4`로 dispatch합니다. 이 함수는 tenant/user/policy version에 해당하는 기존 row를 invalidation한 뒤 현재 user와 chunk 상태에서 active projection을 다시 만듭니다.
+- 요청한 user source가 없거나 policy version이 stale이거나 scope가 잘못된 경우 read model rebuild를 fail-closed 처리합니다.
 
 경계 규칙:
 

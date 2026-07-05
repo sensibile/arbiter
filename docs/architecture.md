@@ -121,7 +121,8 @@ Responsibilities:
 - Run one bounded outbox processing pass through `Arbiter.Sync.OutboxProcessor.run_once/2`.
 - Mark claimed rows as terminal only when the persisted `id`, `attempts`, and `locked_at` still match the claimed row.
 - Dispatch `invalidate_user_access_cache` events to `Arbiter.ReadModels.invalidate_user_access/4` so old `accessible_document_chunks` rows are invalidated after revoke.
-- Map `rebuild_user_access_projection` events to validated read model commands. The command contract is implemented, but execution is intentionally unsupported until the rebuild executor exists; those rows are marked `failed` rather than silently succeeding.
+- Dispatch `rebuild_user_access_projection` events to `Arbiter.ReadModels.rebuild_user_access_projection/4`, which invalidates old rows for the tenant/user/policy version and rebuilds active projections from current user and chunk state.
+- Fail read model rebuilds closed when the requested user source is missing, policy-version stale, or scope malformed.
 
 Boundary rule:
 

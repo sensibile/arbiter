@@ -129,6 +129,130 @@ defmodule Arbiter.ReadModels.AccessibleDocumentChunkTest do
                "not-a-datetime"
              ) == {:error, :invalid_invalidation_scope}
     end
+
+    test "rebuilds user access projections from current tenant chunks" do
+      %{tenant: tenant, user: user, document: document, chunk: allowed_chunk} =
+        fixture_scope(policy_version: "policy_v14")
+
+      high_sensitivity_chunk =
+        chunk_fixture(tenant, document, policy_version: "policy_v14", sensitivity_level: 9)
+
+      deleted_chunk =
+        chunk_fixture(tenant, document, policy_version: "policy_v14", deleted_at: @now)
+
+      sales_chunk =
+        chunk_fixture(tenant, document, policy_version: "policy_v14", department_id: "sales")
+
+      stale_policy_chunk = chunk_fixture(tenant, document, policy_version: "policy_v13")
+      %{tenant: other_tenant, document: other_document} = fixture_scope(policy_version: "policy_v14")
+      _other_tenant_chunk = chunk_fixture(other_tenant, other_document, policy_version: "policy_v14")
+
+      assert {:ok, stale_projection} =
+               put_projection(tenant, user, document, high_sensitivity_chunk,
+                 user_policy_version: "policy_v14",
+                 projected_at: @now
+               )
+
+      assert {:ok,
+              %{
+                projected: 1,
+                skipped: 4,
+                invalidated: 1,
+                skipped_reasons: %{
+                  outside_sensitivity_scope: 1,
+                  chunk_deleted: 1,
+                  outside_department_scope: 1,
+                  stale_chunk_policy_version: 1
+                }
+              }} =
+               ReadModels.rebuild_user_access_projection(
+                 tenant.id,
+                 user.id,
+                 "policy_v14",
+                 @now
+               )
+
+      assert active_chunk_ids(tenant, user, "policy_v14") == [allowed_chunk.id]
+      assert Repo.get!(AccessibleDocumentChunk, stale_projection.id).invalidated_at == @now
+      refute high_sensitivity_chunk.id in active_chunk_ids(tenant, user, "policy_v14")
+      refute deleted_chunk.id in active_chunk_ids(tenant, user, "policy_v14")
+      refute sales_chunk.id in active_chunk_ids(tenant, user, "policy_v14")
+      refute stale_policy_chunk.id in active_chunk_ids(tenant, user, "policy_v14")
+    end
+
+    test "rebuild is idempotent for the same user policy version" do
+      %{tenant: tenant, user: user, chunk: chunk} = fixture_scope(policy_version: "policy_v15")
+
+      assert {:ok, %{projected: 1, skipped: 0, invalidated: 0}} =
+               ReadModels.rebuild_user_access_projection(
+                 tenant.id,
+                 user.id,
+                 "policy_v15",
+                 @now
+               )
+
+      assert active_chunk_ids(tenant, user, "policy_v15") == [chunk.id]
+
+      assert {:ok, %{projected: 1, skipped: 0, invalidated: 1}} =
+               ReadModels.rebuild_user_access_projection(
+                 tenant.id,
+                 user.id,
+                 "policy_v15",
+                 DateTime.add(@now, 60, :second)
+               )
+
+      assert active_chunk_ids(tenant, user, "policy_v15") == [chunk.id]
+    end
+
+    test "rebuild invalidates old rows and grants nothing for inactive users" do
+      %{tenant: tenant, document: document, chunk: chunk} = fixture_scope(policy_version: "policy_v16")
+
+      inactive_user =
+        user_fixture(tenant,
+          email: "inactive-read-model-user-#{System.unique_integer([:positive])}@example.com",
+          status: "inactive",
+          policy_version: "policy_v16"
+        )
+
+      assert {:ok, projection} =
+               put_projection(tenant, inactive_user, document, chunk,
+                 user_policy_version: "policy_v16",
+                 projected_at: @now
+               )
+
+      assert {:ok,
+              %{
+                projected: 0,
+                skipped: 1,
+                invalidated: 1,
+                skipped_reasons: %{inactive_user: 1}
+              }} =
+               ReadModels.rebuild_user_access_projection(
+                 tenant.id,
+                 inactive_user.id,
+                 "policy_v16",
+                 @now
+               )
+
+      assert active_chunk_ids(tenant, inactive_user, "policy_v16") == []
+      assert Repo.get!(AccessibleDocumentChunk, projection.id).invalidated_at == @now
+    end
+
+    test "rebuild fails closed for missing sources and malformed scopes" do
+      assert ReadModels.rebuild_user_access_projection(
+               Ecto.UUID.generate(),
+               Ecto.UUID.generate(),
+               "policy_v1",
+               @now
+             ) == {:error, :user_projection_source_not_found}
+
+      assert ReadModels.rebuild_user_access_projection(
+               Ecto.UUID.generate(),
+               Ecto.UUID.generate(),
+               "policy_v1",
+               "not-a-datetime"
+             ) == {:error, :invalid_rebuild_scope}
+    end
   end
 
   defp active_chunk_ids(tenant, user, user_policy_version) do

@@ -60,7 +60,7 @@ Read model 저장소 계약은 다음과 같습니다.
 | Write-side 변경 | Outbox command | Command status | Read model 대상 | 조회 형태 |
 | --- | --- | --- | --- | --- |
 | User membership, role, status, clearance, policy-version 변경 | `invalidate_user_access_cache` | 구현된 MVP command | User access projection table/cache | `tenant_id`, `user_id`, `policy_version` |
-| User membership, role, status, clearance, policy-version 변경 | `rebuild_user_access_projection` | Command contract 구현, executor 계획됨 | User access projection table/cache | `tenant_id`, `user_id`, `policy_version` |
+| User membership, role, status, clearance, policy-version 변경 | `rebuild_user_access_projection` | 구현된 MVP command/executor | User access projection table/cache | `tenant_id`, `user_id`, `policy_version` |
 | Policy DSL, policy version, scope에 영향을 주는 tenant 설정 변경 | `rebuild_policy_scope_projection` | 계획된 projection command | Policy scope projection table/cache | `tenant_id`, `policy_id`, `resource_type`, `action`, `policy_version` |
 | Tool permission 또는 tool contract 변경 | `invalidate_tool_result_cache` | 구현된 MVP command | Tool permission projection/cache | `tenant_id`, `user_id`, `tool`, `action`, `policy_version` |
 | Tool permission 또는 tool contract 변경 | `rebuild_tool_permission_projection` | 계획된 projection command | Tool permission projection/cache | `tenant_id`, `user_id`, `tool`, `action`, `policy_version` |
@@ -157,6 +157,6 @@ MVP에는 현재 다음 구현이 포함되어 있습니다.
 - Projection upsert, active lookup, user-policy invalidation을 담당하는 `Arbiter.ReadModels`
 - User-access invalidation 및 rebuild outbox event를 read model command로 매핑하는 `Arbiter.Sync.OutboxReadModelDispatch`
 - Pending outbox row를 claim하고 지원되는 read model command를 dispatch한 뒤 row를 processed 또는 failed로 표시하는 bounded pass인 `Arbiter.Sync.OutboxProcessor.run_once/2`
-- Rebuild executor가 추가되기 전까지 실행은 unsupported로 표시하는 `rebuild_user_access_projection` command validation
+- 기존 row를 invalidation한 뒤 현재 user와 chunk 상태에서 active projection을 다시 만드는 `Arbiter.ReadModels.rebuild_user_access_projection/4` 기반 `rebuild_user_access_projection` 실행
 - User/resource policy version에 대한 Gateway stale snapshot check
 - Hot-path core에 직접 Repo/read-model dependency를 만들지 않고 accessible chunk id를 retrieval adapter에 전달하는 Gateway read model scope injection
