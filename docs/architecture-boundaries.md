@@ -26,13 +26,15 @@ Declared groups:
 | `Arbiter.Audit` | `AnswerLineage` | `Arbiter.Policy`, `Arbiter.Repo`, `Arbiter.Retrieval` |
 | `Arbiter.Documents` | `Chunk`, `Document` | `Arbiter.Tenants` |
 | `Arbiter.Gateway` | `Error`, `Result`, `ToolCall` | `Arbiter.Policy`, `Arbiter.Retrieval` |
+| `Arbiter.Observability` | `AuditTelemetry`, `GatewayTelemetry` | `Arbiter.Audit`, `Arbiter.Gateway` |
+| `Arbiter.Operations` | `Health` | `Arbiter.Repo`, `Arbiter.Sync` |
 | `Arbiter.Policy` | policy core structs, authorizer, and modules | none |
 | `Arbiter.ReadModels` | `AccessibleDocumentChunk`, `AccessibleDocumentChunkBuilder` | `Arbiter.Documents`, `Arbiter.Policy`, `Arbiter.Repo`, `Arbiter.Tenants` |
 | `Arbiter.Repo` | none | none |
 | `Arbiter.Retrieval` | retrieval guard structs and modules | `Arbiter.Policy` |
 | `Arbiter.Sync` | outbox, revoke, processor, worker modules | `Arbiter.Adapters`, `Arbiter.Policy`, `Arbiter.ReadModels`, `Arbiter.Repo`, `Arbiter.Tenants` |
 | `Arbiter.Tenants` | tenant schemas | none |
-| `ArbiterWeb` | Phoenix web modules | none |
+| `ArbiterWeb` | Phoenix web modules | `Arbiter` |
 
 ## Enforced Rules
 
@@ -42,6 +44,8 @@ Declared groups:
 - Repo-backed and external authorizer shells live behind `Arbiter.Authorizers`; `Arbiter.Policy` remains pure.
 - `Arbiter.ReadModels` owns projection storage and may use Repo, command schemas, and policy decision structs.
 - `Arbiter.Sync` owns outbox/revoke orchestration and may call read model and Repo boundaries.
+- `Arbiter.Operations` owns operational probes and may call Repo-backed operational state.
+- `Arbiter.Observability` owns telemetry side effects and keeps emitted metadata bounded.
 - `Arbiter.Application` is the composition root for the domain app and Phoenix web boundary.
 
 ## Review Commands

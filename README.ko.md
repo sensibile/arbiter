@@ -53,6 +53,7 @@ flowchart LR
 - 접근 가능한 chunk read model projection, rebuild 실행, 선택적 supervised outbox processing
 - Scoped outbox invalidation을 위한 cache adapter contract와 local in-memory 구현
 - Guarded retrieval execution을 위한 search adapter contract와 local in-memory 구현
+- 운영 probe를 위한 liveness와 readiness endpoint
 
 구현된 모듈 경계와 계약 요약은 `docs/architecture.ko.md`를 참고하세요.
 저장소 전략은 `docs/adr/0001-state-sourced-cqrs.ko.md`를 참고하세요.
@@ -117,6 +118,15 @@ mix phx.server
 
 기본 로컬 데이터베이스 URL은 `ecto://postgres:postgres@localhost:55432/arbiter_dev`입니다.
 `DATABASE_URL`로 덮어쓸 수 있고, 테스트에서는 `TEST_DATABASE_URL`을 사용할 수 있습니다.
+
+운영 probe:
+
+```sh
+curl http://localhost:4000/healthz
+curl http://localhost:4000/readyz
+```
+
+`/healthz`는 process liveness만 확인합니다. `/readyz`는 database 접근을 확인하고 `pending`, `processing`, `failed` outbox row의 제한된 backlog count를 반환합니다.
 
 Supervised outbox worker는 기본적으로 비활성화되어 있습니다. App process가 bounded read model propagation pass를 주기적으로 실행해야 할 때 명시적으로 켭니다.
 

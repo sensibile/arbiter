@@ -26,13 +26,15 @@ mix boundary.spec
 | `Arbiter.Audit` | `AnswerLineage` | `Arbiter.Policy`, `Arbiter.Repo`, `Arbiter.Retrieval` |
 | `Arbiter.Documents` | `Chunk`, `Document` | `Arbiter.Tenants` |
 | `Arbiter.Gateway` | `Error`, `Result`, `ToolCall` | `Arbiter.Policy`, `Arbiter.Retrieval` |
+| `Arbiter.Observability` | `AuditTelemetry`, `GatewayTelemetry` | `Arbiter.Audit`, `Arbiter.Gateway` |
+| `Arbiter.Operations` | `Health` | `Arbiter.Repo`, `Arbiter.Sync` |
 | `Arbiter.Policy` | policy core struct, authorizer, module | 없음 |
 | `Arbiter.ReadModels` | `AccessibleDocumentChunk`, `AccessibleDocumentChunkBuilder` | `Arbiter.Documents`, `Arbiter.Policy`, `Arbiter.Repo`, `Arbiter.Tenants` |
 | `Arbiter.Repo` | 없음 | 없음 |
 | `Arbiter.Retrieval` | retrieval guard struct와 module | `Arbiter.Policy` |
 | `Arbiter.Sync` | outbox, revoke, processor, worker module | `Arbiter.Adapters`, `Arbiter.Policy`, `Arbiter.ReadModels`, `Arbiter.Repo`, `Arbiter.Tenants` |
 | `Arbiter.Tenants` | tenant schema | 없음 |
-| `ArbiterWeb` | Phoenix web module | 없음 |
+| `ArbiterWeb` | Phoenix web module | `Arbiter` |
 
 ## Enforced Rule
 
@@ -42,6 +44,8 @@ mix boundary.spec
 - Repo-backed와 external authorizer shell은 `Arbiter.Authorizers` 뒤에 두며, `Arbiter.Policy`는 순수하게 유지합니다.
 - `Arbiter.ReadModels`는 projection storage를 소유하며 Repo, command schema, policy decision struct를 사용할 수 있습니다.
 - `Arbiter.Sync`는 outbox/revoke orchestration을 소유하며 read model과 Repo boundary를 호출할 수 있습니다.
+- `Arbiter.Operations`는 운영 probe를 소유하며 Repo 기반 운영 상태를 호출할 수 있습니다.
+- `Arbiter.Observability`는 telemetry side effect를 소유하며 방출되는 metadata를 제한된 형태로 유지합니다.
 - `Arbiter.Application`은 domain app과 Phoenix web boundary의 composition root입니다.
 
 ## Review Command

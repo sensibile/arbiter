@@ -10,6 +10,7 @@ defmodule Arbiter do
       Documents,
       Gateway,
       Observability,
+      Operations,
       Policy,
       ReadModels,
       Repo,
@@ -25,4 +26,8 @@ defmodule Arbiter do
   Contexts are also responsible for managing your data, regardless
   if it comes from the database, an external API or others.
   """
+
+  def health_liveness, do: Arbiter.Operations.Health.liveness()
+  def health_readiness(opts \\ []), do: Arbiter.Operations.Health.readiness(opts)
+  def health_ready?(readiness), do: Arbiter.Operations.Health.ready?(readiness)
 end

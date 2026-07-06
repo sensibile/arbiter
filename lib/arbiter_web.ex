@@ -1,8 +1,8 @@
 defmodule ArbiterWeb do
   use Boundary,
     top_level?: true,
-    deps: [],
-    exports: [Endpoint, ErrorJSON, Gettext, Router, Telemetry]
+    deps: [Arbiter],
+    exports: [Endpoint, ErrorJSON, Gettext, HealthController, Router, Telemetry]
 
   @moduledoc """
   The entrypoint for defining your web interface, such

@@ -119,6 +119,22 @@ Boundary rule:
 - Gateway telemetry must not include tenant, user, agent run, query, prompt, chunk, payload, or row identifiers.
 - Audit telemetry must not include tenant, user, agent run, answer, policy decision, query, chunk, payload, or row identifiers.
 
+### Operations Boundary
+
+Owned by `Arbiter.Operations.*`.
+
+Responsibilities:
+
+- Provide process-local liveness data without calling external dependencies.
+- Provide readiness data by checking database access and bounded outbox backlog counts.
+- Expose readiness state through the top-level `Arbiter` facade for web controllers and deployment probes.
+
+Boundary rule:
+
+- Operations modules may call Repo-backed operational state, but must not call policy engines, Gateway execution, retrieval adapters, cache adapters, HTTP clients, clocks, or ID generators.
+- Readiness output must stay bounded and must not include tenant, user, aggregate, payload, query, or row identifiers.
+- `ArbiterWeb.HealthController` must call the top-level `Arbiter` facade rather than reaching into this boundary directly.
+
 ### Audit Boundary
 
 Owned by `Arbiter.Audit`.

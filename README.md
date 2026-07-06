@@ -53,6 +53,7 @@ The current implementation has completed the first MVP pass:
 - Accessible chunk read model projection, rebuild execution, and optional supervised outbox processing
 - Cache adapter contract with a local in-memory implementation for scoped outbox invalidation
 - Search adapter contract with a local in-memory implementation for guarded retrieval execution
+- Liveness and readiness endpoints for operational probes
 
 See `docs/architecture.md` for the implemented module boundaries and contract summary.
 See `docs/adr/0001-state-sourced-cqrs.md` for the storage strategy.
@@ -117,6 +118,17 @@ mix phx.server
 
 The default local database URL is `ecto://postgres:postgres@localhost:55432/arbiter_dev`.
 Override it with `DATABASE_URL`; tests can use `TEST_DATABASE_URL`.
+
+Operational probes:
+
+```sh
+curl http://localhost:4000/healthz
+curl http://localhost:4000/readyz
+```
+
+`/healthz` checks process liveness only. `/readyz` checks database access and
+returns bounded outbox backlog counts for `pending`, `processing`, and `failed`
+rows.
 
 The supervised outbox worker is disabled by default. Enable it explicitly when
 you want the app process to run bounded read model propagation passes:

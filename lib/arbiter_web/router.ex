@@ -5,6 +5,11 @@ defmodule ArbiterWeb.Router do
     plug :accepts, ["json"]
   end
 
+  scope "/", ArbiterWeb do
+    get "/healthz", HealthController, :liveness
+    get "/readyz", HealthController, :readiness
+  end
+
   scope "/api", ArbiterWeb do
     pipe_through :api
   end

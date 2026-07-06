@@ -119,6 +119,22 @@
 - Gateway telemetry에는 tenant, user, agent run, query, prompt, chunk, payload, row identifier를 포함하지 않아야 합니다.
 - Audit telemetry에는 tenant, user, agent run, answer, policy decision, query, chunk, payload, row identifier를 포함하지 않아야 합니다.
 
+### Operations Boundary
+
+소유 모듈: `Arbiter.Operations.*`
+
+책임:
+
+- 외부 의존성을 호출하지 않고 process-local liveness data를 제공합니다.
+- Database 접근과 제한된 outbox backlog count를 확인해 readiness data를 제공합니다.
+- Web controller와 deployment probe가 사용할 수 있도록 top-level `Arbiter` facade를 통해 readiness state를 노출합니다.
+
+경계 규칙:
+
+- Operations 모듈은 Repo 기반 운영 상태를 호출할 수 있지만 policy engine, Gateway execution, retrieval adapter, cache adapter, HTTP client, clock, ID generator를 호출하지 않아야 합니다.
+- Readiness output은 제한된 형태를 유지해야 하며 tenant, user, aggregate, payload, query, row identifier를 포함하지 않아야 합니다.
+- `ArbiterWeb.HealthController`는 이 boundary를 직접 호출하지 않고 top-level `Arbiter` facade를 호출해야 합니다.
+
 ### Audit Boundary
 
 소유 모듈: `Arbiter.Audit`
