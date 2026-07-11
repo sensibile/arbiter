@@ -12,6 +12,8 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
 
   @now ~U[2026-06-24 01:02:03Z]
 
+  def invalidate(target, command), do: target.(command)
+
   setup_all do
     Ecto.Adapters.SQL.Sandbox.mode(Repo, :auto)
     Ecto.Migrator.run(Repo, :up, all: true)
@@ -252,6 +254,32 @@ defmodule Arbiter.Sync.OutboxConsumerTest do
 
       assert failed_event.status == "failed"
       assert failed_event.last_error == "invalid_cache_adapter"
+    end
+
+    test "marks cache events failed when the adapter raises" do
+      tenant = tenant_fixture("outbox-consumer-tenant")
+      user_id = Ecto.UUID.generate()
+
+      event =
+        tenant
+        |> outbox_event_fixture(
+          event_type: "invalidate_tool_result_cache",
+          aggregate_id: user_id,
+          payload: invalidate_user_access_payload(tenant.id, user_id, "policy_v12", "policy_v13")
+        )
+        |> claim!()
+
+      adapter = fn _command -> raise "cache unavailable" end
+
+      assert {:error, failed_event} =
+               OutboxConsumer.process_event(event,
+                 now: @now,
+                 cache_adapter: {__MODULE__, adapter}
+               )
+
+      assert failed_event.status == "failed"
+      assert failed_event.last_error == "outbox_command_failed"
+      assert Repo.get!(OutboxEvent, event.id).status == "failed"
     end
 
     test "rebuilds user access projections and marks rebuild events processed" do

@@ -56,7 +56,7 @@ defmodule Arbiter.Sync.OutboxConsumer do
 
     event
     |> dispatch_command(now)
-    |> execute_command(opts)
+    |> execute_command_safely(opts)
     |> mark_processed_or_failed(event, now)
   end
 
@@ -137,6 +137,14 @@ defmodule Arbiter.Sync.OutboxConsumer do
   end
 
   defp execute_command({:error, reason}, _opts), do: {:error, reason}
+
+  defp execute_command_safely(command, opts) do
+    execute_command(command, opts)
+  rescue
+    _exception -> {:error, :outbox_command_failed}
+  catch
+    _kind, _reason -> {:error, :outbox_command_failed}
+  end
 
   defp mark_processed_or_failed({:ok, _result}, event, now), do: mark_processed(event, now: now)
 

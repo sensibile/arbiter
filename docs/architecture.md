@@ -133,6 +133,7 @@ Boundary rule:
 
 - Operations modules may call Repo-backed operational state, but must not call policy engines, Gateway execution, retrieval adapters, cache adapters, HTTP clients, clocks, or ID generators.
 - Readiness output must stay bounded and must not include tenant, user, aggregate, payload, query, or row identifiers.
+- Database and outbox readiness failures must return bounded not-ready data rather than raise through the probe endpoint.
 - `ArbiterWeb.HealthController` must call the top-level `Arbiter` facade rather than reaching into this boundary directly.
 
 ### Audit Boundary
@@ -208,6 +209,7 @@ Responsibilities:
 - Dispatch `invalidate_user_access_cache` events to `Arbiter.ReadModels.invalidate_user_access/4` so old `accessible_document_chunks` rows are invalidated after revoke.
 - Dispatch `rebuild_user_access_projection` events to `Arbiter.ReadModels.rebuild_user_access_projection/4`, which invalidates old rows for the tenant/user/policy version and rebuilds active projections from current user and chunk state.
 - Dispatch `invalidate_tool_result_cache` and `invalidate_retrieval_result_cache` events through configured cache adapters using validated tenant/user/policy-version scope.
+- Normalize command and adapter exceptions into failed outbox rows so claimed work does not remain processing after an execution failure.
 - Fail read model rebuilds closed when the requested user source is missing, policy-version stale, or scope malformed.
 
 Boundary rule:
@@ -219,6 +221,7 @@ Boundary rule:
 - `Arbiter.Sync.OutboxCacheDispatch` must stay pure. It validates event payloads and returns cache adapter commands, but does not call adapters.
 - `Arbiter.Sync.OutboxWorker` must not know read model or cache command details. It schedules `Arbiter.Sync.OutboxProcessor.run_once/2` with configured limits, intervals, and optional worker ownership.
 - Outbox telemetry must not include tenant, user, aggregate, payload, or row identifiers; expose only pass status, limit, duration, and aggregate counts.
+- Failed rows are terminal in the current implementation. Automated retries and stale processing-claim recovery remain future work.
 
 ### Storage Strategy
 

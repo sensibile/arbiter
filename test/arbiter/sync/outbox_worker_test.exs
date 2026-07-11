@@ -43,6 +43,20 @@ defmodule Arbiter.Sync.OutboxWorkerTest do
     assert %{last_result: {:error, :database_unavailable}} = :sys.get_state(pid)
   end
 
+  test "normalizes processor exceptions without crashing" do
+    processor = fn _limit, _opts -> raise "processor failed" end
+
+    pid =
+      start_supervised!(
+        {OutboxWorker,
+         name: unique_name(), limit: 1, interval_ms: @interval_ms, processor: processor}
+      )
+
+    send(pid, :process_outbox)
+
+    assert %{last_result: {:error, :outbox_processor_failed}} = :sys.get_state(pid)
+  end
+
   test "passes configured worker ownership to the processor" do
     parent = self()
 

@@ -32,15 +32,7 @@ defmodule Arbiter.Operations.Health do
 
     case database_check(repo) do
       :ok ->
-        outbox = outbox_check(repo)
-
-        %{
-          status: "ready",
-          checks: %{
-            database: %{status: "ok"},
-            outbox: outbox
-          }
-        }
+        readiness_from_outbox_check(outbox_check(repo))
 
       {:error, reason} ->
         %{
@@ -55,6 +47,26 @@ defmodule Arbiter.Operations.Health do
 
   def ready?(%{status: "ready"}), do: true
   def ready?(_readiness), do: false
+
+  defp readiness_from_outbox_check({:ok, outbox}) do
+    %{
+      status: "ready",
+      checks: %{
+        database: %{status: "ok"},
+        outbox: outbox
+      }
+    }
+  end
+
+  defp readiness_from_outbox_check({:error, reason}) do
+    %{
+      status: "not_ready",
+      checks: %{
+        database: %{status: "ok"},
+        outbox: %{status: "error", reason: reason}
+      }
+    }
+  end
 
   defp database_check(repo) when is_atom(repo) do
     case repo.query("SELECT 1", [], timeout: 1_000) do
@@ -75,12 +87,17 @@ defmodule Arbiter.Operations.Health do
       |> Map.new(fn status -> {status, 0} end)
       |> Map.merge(outbox_counts(repo))
 
-    %{
-      status: "ok",
-      pending: Map.fetch!(counts, OutboxEvent.status_pending()),
-      processing: Map.fetch!(counts, OutboxEvent.status_processing()),
-      failed: Map.fetch!(counts, OutboxEvent.status_failed())
-    }
+    {:ok,
+     %{
+       status: "ok",
+       pending: Map.fetch!(counts, OutboxEvent.status_pending()),
+       processing: Map.fetch!(counts, OutboxEvent.status_processing()),
+       failed: Map.fetch!(counts, OutboxEvent.status_failed())
+     }}
+  rescue
+    _exception -> {:error, "outbox_unavailable"}
+  catch
+    _kind, _reason -> {:error, "outbox_unavailable"}
   end
 
   defp outbox_counts(repo) do

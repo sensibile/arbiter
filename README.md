@@ -128,7 +128,8 @@ curl http://localhost:4000/readyz
 
 `/healthz` checks process liveness only. `/readyz` checks database access and
 returns bounded outbox backlog counts for `pending`, `processing`, and `failed`
-rows.
+rows. Database or outbox check failures return a bounded `503 not_ready`
+response instead of escaping as probe exceptions.
 
 The supervised outbox worker is disabled by default. Enable it explicitly when
 you want the app process to run bounded read model propagation passes:
@@ -143,6 +144,10 @@ config :arbiter, Arbiter.Sync.OutboxWorker,
 
 `worker_id` is optional. When present, claimed outbox rows store it in
 `locked_by` and terminal updates must match that ownership token.
+Command and adapter exceptions are normalized into failed outbox rows, while
+unexpected processor failures are retained as the worker's last error without
+terminating its scheduling process. Failed rows are terminal in the current
+implementation; automated retry and stale-claim recovery are not implemented.
 
 Each outbox processing pass emits `[:arbiter, :sync, :outbox, :processor, :run]`
 telemetry with duration, status, limit, and aggregate row counts only.

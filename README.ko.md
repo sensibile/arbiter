@@ -126,7 +126,7 @@ curl http://localhost:4000/healthz
 curl http://localhost:4000/readyz
 ```
 
-`/healthz`는 process liveness만 확인합니다. `/readyz`는 database 접근을 확인하고 `pending`, `processing`, `failed` outbox row의 제한된 backlog count를 반환합니다.
+`/healthz`는 process liveness만 확인합니다. `/readyz`는 database 접근을 확인하고 `pending`, `processing`, `failed` outbox row의 제한된 backlog count를 반환합니다. Database 또는 outbox 점검 실패는 probe exception으로 전파되지 않고 제한된 `503 not_ready` 응답으로 반환됩니다.
 
 Supervised outbox worker는 기본적으로 비활성화되어 있습니다. App process가 bounded read model propagation pass를 주기적으로 실행해야 할 때 명시적으로 켭니다.
 
@@ -139,6 +139,7 @@ config :arbiter, Arbiter.Sync.OutboxWorker,
 ```
 
 `worker_id`는 선택 사항입니다. 값이 있으면 claim된 outbox row의 `locked_by`에 저장되고, terminal update는 이 ownership token까지 일치해야 합니다.
+Command와 adapter exception은 failed outbox row로 정규화됩니다. 예상하지 못한 processor 실패는 scheduling process를 종료하지 않고 worker의 마지막 error로 보관됩니다. 현재 구현에서 failed row는 terminal 상태이며 자동 retry와 stale claim recovery는 아직 구현하지 않았습니다.
 
 각 outbox processing pass는 duration, status, limit, aggregate row count만 담은 `[:arbiter, :sync, :outbox, :processor, :run]` telemetry를 방출합니다.
 

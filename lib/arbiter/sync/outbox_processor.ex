@@ -18,11 +18,7 @@ defmodule Arbiter.Sync.OutboxProcessor do
   def run_once(limit, opts) when is_integer(limit) and limit > 0 do
     start_time = System.monotonic_time()
 
-    result =
-      with {:ok, events} <- OutboxConsumer.claim_available(limit, opts) do
-        results = Enum.map(events, &process_event(&1, opts))
-        {:ok, summarize_results(events, results)}
-      end
+    result = run_safely(limit, opts)
 
     emit_telemetry(result, limit, start_time)
     result
@@ -41,6 +37,17 @@ defmodule Arbiter.Sync.OutboxProcessor do
       {:error, %OutboxEvent{} = failed_event} -> {:failed, failed_event}
       {:error, reason} -> {:error, reason, event}
     end
+  end
+
+  defp run_safely(limit, opts) do
+    with {:ok, events} <- OutboxConsumer.claim_available(limit, opts) do
+      results = Enum.map(events, &process_event(&1, opts))
+      {:ok, summarize_results(events, results)}
+    end
+  rescue
+    _exception -> {:error, :outbox_processor_failed}
+  catch
+    _kind, _reason -> {:error, :outbox_processor_failed}
   end
 
   defp summarize_results(events, results) do

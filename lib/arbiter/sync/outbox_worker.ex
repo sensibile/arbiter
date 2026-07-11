@@ -44,9 +44,17 @@ defmodule Arbiter.Sync.OutboxWorker do
 
   @impl true
   def handle_info(:process_outbox, state) do
-    result = state.processor.(state.limit, state.processor_opts)
+    result = run_processor(state)
 
     {:noreply, state |> Map.put(:last_result, result) |> schedule_next()}
+  end
+
+  defp run_processor(state) do
+    state.processor.(state.limit, state.processor_opts)
+  rescue
+    _exception -> {:error, :outbox_processor_failed}
+  catch
+    _kind, _reason -> {:error, :outbox_processor_failed}
   end
 
   defp positive_integer(opts, key, default) do

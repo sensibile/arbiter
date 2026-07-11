@@ -133,6 +133,7 @@
 
 - Operations 모듈은 Repo 기반 운영 상태를 호출할 수 있지만 policy engine, Gateway execution, retrieval adapter, cache adapter, HTTP client, clock, ID generator를 호출하지 않아야 합니다.
 - Readiness output은 제한된 형태를 유지해야 하며 tenant, user, aggregate, payload, query, row identifier를 포함하지 않아야 합니다.
+- Database와 outbox readiness 실패는 probe endpoint 밖으로 exception을 발생시키지 않고 제한된 not-ready data를 반환해야 합니다.
 - `ArbiterWeb.HealthController`는 이 boundary를 직접 호출하지 않고 top-level `Arbiter` facade를 호출해야 합니다.
 
 ### Audit Boundary
@@ -208,6 +209,7 @@
 - `invalidate_user_access_cache` event를 `Arbiter.ReadModels.invalidate_user_access/4`로 dispatch해서 revoke 후 오래된 `accessible_document_chunks` row를 invalidation합니다.
 - `rebuild_user_access_projection` event를 `Arbiter.ReadModels.rebuild_user_access_projection/4`로 dispatch합니다. 이 함수는 tenant/user/policy version에 해당하는 기존 row를 invalidation한 뒤 현재 user와 chunk 상태에서 active projection을 다시 만듭니다.
 - `invalidate_tool_result_cache`와 `invalidate_retrieval_result_cache` event를 검증된 tenant/user/policy-version scope로 configured cache adapter에 dispatch합니다.
+- Command와 adapter exception을 failed outbox row로 정규화하여 실행 실패 후 claim된 작업이 processing 상태에 남지 않게 합니다.
 - 요청한 user source가 없거나 policy version이 stale이거나 scope가 잘못된 경우 read model rebuild를 fail-closed 처리합니다.
 
 경계 규칙:
@@ -219,6 +221,7 @@
 - `Arbiter.Sync.OutboxCacheDispatch`는 순수 모듈로 유지해야 합니다. Event payload를 검증하고 cache adapter command를 반환하지만 adapter를 호출하지 않습니다.
 - `Arbiter.Sync.OutboxWorker`는 read model 또는 cache command 세부사항을 알지 않아야 합니다. 설정된 limit, interval, 선택적 worker ownership으로 `Arbiter.Sync.OutboxProcessor.run_once/2`만 schedule합니다.
 - Outbox telemetry에는 tenant, user, aggregate, payload, row identifier를 포함하지 않아야 합니다. Pass status, limit, duration, aggregate count만 노출합니다.
+- 현재 구현에서 failed row는 terminal 상태입니다. 자동 retry와 오래된 processing claim 복구는 후속 작업입니다.
 
 ### 저장소 전략
 

@@ -12,6 +12,11 @@ defmodule Arbiter.Operations.HealthTest do
     def query("SELECT 1", [], _opts), do: {:error, :database_down}
   end
 
+  defmodule OutboxUnavailableRepo do
+    def query("SELECT 1", [], _opts), do: {:ok, %{rows: [[1]]}}
+    def all(_query, _opts), do: raise("outbox query failed")
+  end
+
   test "liveness is process-local and reports ok" do
     assert Health.liveness() == %{
              status: "ok",
@@ -43,6 +48,20 @@ defmodule Arbiter.Operations.HealthTest do
              checks: %{
                database: %{status: "error", reason: "database_unavailable"},
                outbox: %{status: "unknown"}
+             }
+           }
+
+    refute Health.ready?(readiness)
+  end
+
+  test "readiness fails closed without crashing when outbox cannot be checked" do
+    readiness = Health.readiness(repo: OutboxUnavailableRepo)
+
+    assert readiness == %{
+             status: "not_ready",
+             checks: %{
+               database: %{status: "ok"},
+               outbox: %{status: "error", reason: "outbox_unavailable"}
              }
            }
 
