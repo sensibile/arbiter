@@ -5,10 +5,11 @@ defmodule Arbiter.GatewayTest do
   alias Arbiter.Adapters.Search.Memory
   alias Arbiter.Authorizers.Casbin
   alias Arbiter.Gateway
-  alias Arbiter.Gateway.ToolCall
   alias Arbiter.Policy.Authorizer
   alias Arbiter.Policy.Authorizer.Static
   alias Arbiter.Policy.Decision
+
+  import Arbiter.GatewayFixtures
 
   describe "run_tool_call/2" do
     test "authorizes, forces retrieval filters, post-validates chunks, and returns audit data" do
@@ -61,8 +62,8 @@ defmodule Arbiter.GatewayTest do
                decision: "allow",
                reason: ["same_tenant", "active_user", "clearance_ok", "department_scope_matched"],
                policy_version: "policy_v12",
-               user_snapshot: %{"id" => "user_123", "tenant_id" => "tenant_a"},
-               resource_snapshot: %{"resource_type" => "document_chunk"},
+               user_snapshot: tool_call.user_snapshot,
+               resource_snapshot: tool_call.resource_snapshot,
                retrieved_chunk_ids: ["chunk_1", "chunk_2"],
                accepted_chunk_ids: ["chunk_1"],
                rejected_chunk_ids: ["chunk_2"],
@@ -766,35 +767,6 @@ defmodule Arbiter.GatewayTest do
     assert error.audit_event.decision == "deny"
     assert error.audit_event.reason == [Atom.to_string(reason)]
     assert error.audit_event.status == "failed_closed"
-  end
-
-  defp tool_call(attrs \\ []) do
-    defaults = %{
-      tenant_id: "tenant_a",
-      user_id: "user_123",
-      agent_run_id: "run_456",
-      tool: "semantic_search",
-      action: "retrieve",
-      resource_type: "document_chunk",
-      query: %{"text" => "renewal risk"},
-      user_snapshot: %{"id" => "user_123", "tenant_id" => "tenant_a"},
-      resource_snapshot: %{"resource_type" => "document_chunk"}
-    }
-
-    struct!(ToolCall, Map.merge(defaults, Map.new(attrs)))
-  end
-
-  defp allow_decision do
-    %Decision{
-      decision: :allow,
-      reason: ["same_tenant", "active_user", "clearance_ok", "department_scope_matched"],
-      policy_version: "policy_v12",
-      scope: %{
-        "tenant_id" => "tenant_a",
-        "departments" => ["finance", "legal"],
-        "max_sensitivity" => 3
-      }
-    }
   end
 
   defp chunk(id, attrs) do

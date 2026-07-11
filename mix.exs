@@ -91,12 +91,16 @@ defmodule Arbiter.MixProject do
   end
 
   defp core_coverage_ignored_modules do
+    core_coverage_scaffold_modules() ++
+      core_coverage_schema_modules() ++
+      core_coverage_shell_modules() ++
+      core_coverage_test_support_modules()
+  end
+
+  defp core_coverage_scaffold_modules do
     [
       Arbiter,
       Arbiter.Application,
-      Arbiter.Authorizers,
-      Arbiter.Authorizers.Casbin,
-      Arbiter.Authorizers.RepoBacked,
       Arbiter.Repo,
       ArbiterWeb,
       ArbiterWeb.Endpoint,
@@ -104,30 +108,50 @@ defmodule Arbiter.MixProject do
       ArbiterWeb.Gettext,
       ArbiterWeb.HealthController,
       ArbiterWeb.Router,
-      ArbiterWeb.Telemetry,
+      ArbiterWeb.Telemetry
+    ]
+  end
+
+  defp core_coverage_schema_modules do
+    [
       Arbiter.Agents.AgentRun,
-      Arbiter.Audit,
       Arbiter.Audit.AnswerLineage,
       Arbiter.Documents.Chunk,
       Arbiter.Documents.Document,
-      Arbiter.Observability.AuditTelemetry,
-      Arbiter.Operations.Health,
       Arbiter.Policy.Policy,
       Arbiter.Policy.PolicyDecision,
-      Arbiter.ReadModels,
       Arbiter.ReadModels.AccessibleDocumentChunk,
       Arbiter.Retrieval.RetrievalTrace,
       Arbiter.Sync.Outbox,
       Arbiter.Sync.OutboxEvent,
-      Arbiter.Sync.OutboxConsumer,
-      Arbiter.Sync.OutboxProcessor,
-      Arbiter.Sync.RevokeSimulation,
-      Arbiter.DomainFixtures,
-      Arbiter.SyncFixtures,
       Arbiter.Tenants.Group,
       Arbiter.Tenants.Membership,
       Arbiter.Tenants.Tenant,
       Arbiter.Tenants.User
+    ]
+  end
+
+  defp core_coverage_shell_modules do
+    [
+      Arbiter.Audit,
+      Arbiter.Authorizers,
+      Arbiter.Authorizers.Casbin,
+      Arbiter.Authorizers.RepoBacked,
+      Arbiter.Observability.AuditTelemetry,
+      Arbiter.Operations.Health,
+      Arbiter.ReadModels,
+      Arbiter.Sync.OutboxConsumer,
+      Arbiter.Sync.OutboxProcessor,
+      Arbiter.Sync.RevokeSimulation
+    ]
+  end
+
+  defp core_coverage_test_support_modules do
+    [
+      Arbiter.DomainFixtures,
+      Arbiter.GatewayFixtures,
+      Arbiter.SyncFixtures,
+      Arbiter.TelemetryHelpers
     ]
   end
 end

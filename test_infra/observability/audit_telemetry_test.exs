@@ -7,6 +7,7 @@ defmodule Arbiter.Observability.AuditTelemetryInfraTest do
   alias Arbiter.Retrieval.RetrievalTrace
 
   import Arbiter.DomainFixtures
+  import Arbiter.TelemetryHelpers
 
   setup_all do
     Ecto.Adapters.SQL.Sandbox.mode(Repo, :auto)
@@ -16,7 +17,7 @@ defmodule Arbiter.Observability.AuditTelemetryInfraTest do
   end
 
   setup do
-    attach_audit_telemetry()
+    attach_telemetry(AuditTelemetry.telemetry_event(), :audit_telemetry)
   end
 
   test "emits bounded telemetry for persisted retrieval decisions" do
@@ -54,58 +55,6 @@ defmodule Arbiter.Observability.AuditTelemetryInfraTest do
     assert metadata == %{operation: :retrieval_decision, status: :error, result: :retrieval_trace}
   end
 
-  defp attach_audit_telemetry do
-    test_pid = self()
-    handler_id = {__MODULE__, test_pid, System.unique_integer([:positive])}
-
-    :ok =
-      :telemetry.attach(
-        handler_id,
-        AuditTelemetry.telemetry_event(),
-        fn _event, measurements, metadata, pid ->
-          send(pid, {:audit_telemetry, measurements, metadata})
-        end,
-        test_pid
-      )
-
-    on_exit(fn -> :telemetry.detach(handler_id) end)
-  end
-
-  defp fixture_scope do
-    tenant = tenant_fixture("audit-telemetry-tenant")
-
-    user =
-      user_fixture(tenant,
-        email: "audit-telemetry-#{System.unique_integer([:positive])}@example.com"
-      )
-
-    agent_run = agent_run_fixture(tenant, user)
-
-    %{tenant: tenant, user: user, agent_run: agent_run}
-  end
-
-  defp retrieval_event(%{tenant: tenant, user: user, agent_run: agent_run}, attrs) do
-    Map.merge(
-      %{
-        event_type: "retrieval_decision",
-        tenant_id: tenant.id,
-        user_id: user.id,
-        agent_run_id: agent_run.id,
-        tool: "semantic_search",
-        action: "retrieve",
-        resource_type: "document_chunk",
-        decision: "allow",
-        reason: ["same_tenant"],
-        policy_version: "policy_v12",
-        retrieved_chunk_ids: [],
-        accepted_chunk_ids: [],
-        rejected_chunk_ids: [],
-        applied_filter: %{},
-        user_snapshot: %{"id" => user.id, "tenant_id" => tenant.id},
-        resource_snapshot: %{"resource_type" => "document_chunk"},
-        status: "allowed"
-      },
-      attrs
-    )
-  end
+  defp fixture_scope, do: retrieval_scope_fixture("audit-telemetry")
+  defp retrieval_event(scope, attrs), do: retrieval_event_attrs(scope, attrs)
 end

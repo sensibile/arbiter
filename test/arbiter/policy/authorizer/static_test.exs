@@ -1,9 +1,10 @@
 defmodule Arbiter.Policy.Authorizer.StaticTest do
   use ExUnit.Case, async: true
 
-  alias Arbiter.Gateway.ToolCall
   alias Arbiter.Policy.Authorizer
   alias Arbiter.Policy.Authorizer.Static
+
+  import Arbiter.GatewayFixtures
 
   describe "authorize/2" do
     test "allows matching RBAC permissions and builds ABAC retrieval scope" do
@@ -238,24 +239,5 @@ defmodule Arbiter.Policy.Authorizer.StaticTest do
     }
   end
 
-  defp request(attrs \\ []) do
-    defaults = %{
-      tenant_id: "tenant_a",
-      user_id: "user_123",
-      agent_run_id: "run_456",
-      tool: "semantic_search",
-      action: "retrieve",
-      resource_type: "document_chunk",
-      query: %{"text" => "renewal risk"},
-      user_snapshot: %{
-        "id" => "user_123",
-        "tenant_id" => "tenant_a",
-        "department_ids" => ["finance", "legal"],
-        "clearance_level" => 3
-      },
-      resource_snapshot: %{"resource_type" => "document_chunk"}
-    }
-
-    struct!(ToolCall, Map.merge(defaults, Map.new(attrs)))
-  end
+  defp request(attrs \\ []), do: tool_call(attrs)
 end

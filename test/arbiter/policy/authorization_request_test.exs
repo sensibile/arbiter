@@ -1,8 +1,9 @@
 defmodule Arbiter.Policy.AuthorizationRequestTest do
   use ExUnit.Case, async: true
 
-  alias Arbiter.Gateway.ToolCall
   alias Arbiter.Policy.AuthorizationRequest
+
+  import Arbiter.GatewayFixtures
 
   test "normalizes gateway tool calls into explicit authorizer requests" do
     assert {:ok, request} = AuthorizationRequest.normalize(tool_call())
@@ -59,31 +60,8 @@ defmodule Arbiter.Policy.AuthorizationRequestTest do
   end
 
   test "revalidates already-built request structs" do
-    request = struct!(AuthorizationRequest, Map.put(valid_attrs(), :tenant_id, ""))
+    request = struct!(AuthorizationRequest, Map.put(tool_call_attrs(), :tenant_id, ""))
 
     assert AuthorizationRequest.normalize(request) == {:error, :invalid_tenant_id}
-  end
-
-  defp tool_call(attrs \\ []) do
-    struct!(ToolCall, Map.merge(valid_attrs(), Map.new(attrs)))
-  end
-
-  defp valid_attrs do
-    %{
-      tenant_id: "tenant_a",
-      user_id: "user_123",
-      agent_run_id: "run_456",
-      tool: "semantic_search",
-      action: "retrieve",
-      resource_type: "document_chunk",
-      query: %{"text" => "renewal risk"},
-      user_snapshot: %{
-        "id" => "user_123",
-        "tenant_id" => "tenant_a",
-        "department_ids" => ["finance", "legal"],
-        "clearance_level" => 3
-      },
-      resource_snapshot: %{"resource_type" => "document_chunk"}
-    }
   end
 end

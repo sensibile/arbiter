@@ -85,4 +85,42 @@ defmodule Arbiter.DomainFixtures do
     |> Chunk.changeset(Map.new(attrs))
     |> Repo.insert!()
   end
+
+  def retrieval_scope_fixture(prefix \\ "retrieval") do
+    tenant = tenant_fixture("#{prefix}-tenant")
+
+    user =
+      user_fixture(tenant,
+        email: "#{prefix}-user-#{System.unique_integer([:positive])}@example.com"
+      )
+
+    agent_run = agent_run_fixture(tenant, user)
+
+    %{tenant: tenant, user: user, agent_run: agent_run}
+  end
+
+  def retrieval_event_attrs(%{tenant: tenant, user: user, agent_run: agent_run}, attrs \\ %{}) do
+    Map.merge(
+      %{
+        event_type: "retrieval_decision",
+        tenant_id: tenant.id,
+        user_id: user.id,
+        agent_run_id: agent_run.id,
+        tool: "semantic_search",
+        action: "retrieve",
+        resource_type: "document_chunk",
+        decision: "allow",
+        reason: ["same_tenant"],
+        policy_version: "policy_v12",
+        retrieved_chunk_ids: [],
+        accepted_chunk_ids: [],
+        rejected_chunk_ids: [],
+        applied_filter: %{},
+        user_snapshot: %{"id" => user.id, "tenant_id" => tenant.id},
+        resource_snapshot: %{"resource_type" => "document_chunk"},
+        status: "allowed"
+      },
+      attrs
+    )
+  end
 end

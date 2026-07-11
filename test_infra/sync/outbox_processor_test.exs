@@ -8,6 +8,7 @@ defmodule Arbiter.Sync.OutboxProcessorTest do
   alias Arbiter.Sync.OutboxEvent
   alias Arbiter.Sync.OutboxProcessor
 
+  import Arbiter.TelemetryHelpers
   import Arbiter.SyncFixtures
 
   @now ~U[2026-06-24 02:00:00Z]
@@ -26,7 +27,7 @@ defmodule Arbiter.Sync.OutboxProcessorTest do
     end
 
     test "emits bounded processing telemetry without row identifiers" do
-      attach_processor_telemetry()
+      attach_telemetry(OutboxProcessor.telemetry_event(), :outbox_processor_telemetry)
 
       tenant = tenant_fixture("outbox-processor-telemetry")
       user_id = Ecto.UUID.generate()
@@ -228,20 +229,4 @@ defmodule Arbiter.Sync.OutboxProcessorTest do
     end
   end
 
-  defp attach_processor_telemetry do
-    test_pid = self()
-    handler_id = {__MODULE__, test_pid, System.unique_integer([:positive])}
-
-    :ok =
-      :telemetry.attach(
-        handler_id,
-        OutboxProcessor.telemetry_event(),
-        fn _event, measurements, metadata, pid ->
-          send(pid, {:outbox_processor_telemetry, measurements, metadata})
-        end,
-        test_pid
-      )
-
-    on_exit(fn -> :telemetry.detach(handler_id) end)
-  end
 end

@@ -1,24 +1,14 @@
 defmodule Arbiter.Observability.GatewayTelemetryTest do
   use ExUnit.Case, async: true
 
-  alias Arbiter.Gateway.ToolCall
   alias Arbiter.Observability.GatewayTelemetry
   alias Arbiter.Policy.Decision
 
+  import Arbiter.GatewayFixtures
+  import Arbiter.TelemetryHelpers
+
   setup do
-    handler_id = {__MODULE__, self(), System.unique_integer([:positive])}
-
-    :ok =
-      :telemetry.attach(
-        handler_id,
-        GatewayTelemetry.telemetry_event(),
-        fn _event, measurements, metadata, pid ->
-          send(pid, {:gateway_telemetry, measurements, metadata})
-        end,
-        self()
-      )
-
-    on_exit(fn -> :telemetry.detach(handler_id) end)
+    attach_telemetry(GatewayTelemetry.telemetry_event(), :gateway_telemetry)
   end
 
   test "emits bounded telemetry for allowed tool calls" do
@@ -32,7 +22,16 @@ defmodule Arbiter.Observability.GatewayTelemetryTest do
                       chunk("chunk_2", tenant_id: "tenant_b")
                     ]}
                  end),
-               authorize: authorize(allow_decision())
+               authorize:
+                 authorize(
+                   allow_decision(
+                     scope: %{
+                       "tenant_id" => "tenant_a",
+                       "departments" => ["finance"],
+                       "max_sensitivity" => 3
+                     }
+                   )
+                 )
              )
 
     assert Enum.map(result.allowed_chunks, & &1.id) == ["chunk_1"]
@@ -115,35 +114,6 @@ defmodule Arbiter.Observability.GatewayTelemetryTest do
   end
 
   defp authorize(decision), do: fn _tool_call -> {:ok, decision} end
-
-  defp tool_call(attrs \\ []) do
-    defaults = %{
-      tenant_id: "tenant_a",
-      user_id: "user_123",
-      agent_run_id: "run_456",
-      tool: "semantic_search",
-      action: "retrieve",
-      resource_type: "document_chunk",
-      query: %{"text" => "renewal risk"},
-      user_snapshot: %{"id" => "user_123", "tenant_id" => "tenant_a"},
-      resource_snapshot: %{"resource_type" => "document_chunk"}
-    }
-
-    struct!(ToolCall, Map.merge(defaults, Map.new(attrs)))
-  end
-
-  defp allow_decision do
-    %Decision{
-      decision: :allow,
-      reason: ["same_tenant", "active_user", "clearance_ok", "department_scope_matched"],
-      policy_version: "policy_v12",
-      scope: %{
-        "tenant_id" => "tenant_a",
-        "departments" => ["finance"],
-        "max_sensitivity" => 3
-      }
-    }
-  end
 
   defp chunk(id, attrs) do
     %{
